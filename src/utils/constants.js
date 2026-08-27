@@ -1,0 +1,82 @@
+export const FACILITIES = [
+    // Main Hospital
+    "Sadar Hospital Madhubani",
+    // Primary Health Centres
+    "PHC Pandaul",
+    "PHC Kaluahi",
+    "PHC Babubarhi",
+    "PHC Jhanjharpur",
+    "PHC Khajauli",
+    "PHC Benipatti",
+    "PHC Madhwapur",
+    "PHC Madhepur",
+    // Block PHCs / CHCs
+    "CHC Ladaniya",
+    "CHC Jaynagar",
+    "CHC Khutauna",
+    "CHC Bisffi",
+    "CHC Ghoghardiha",
+    "CHC Phulparas",
+    "CHC Rajnagar",
+    "CHC Basopatti",
+    "CHC Andhrarthari",
+    "CHC Harlakhi",
+    "CHC Laukahi",
+    "CHC Rahika",
+    // Sub-Divisional & Referral Hospitals
+    "Sub-Divisional Hospital Benipatti",
+    "Sub-Divisional Hospital Jhanjharpur",
+    "Sub-Divisional Hospital Phulparas",
+    "Referral Hospital Madhepur",
+];
+
+export const STATUS_CONFIG = {
+    PENDING_VERIFIER: {
+        label: "Pending Verification",
+        color: "#d97706",
+        bg: "#fffbeb",
+        border: "#fde68a",
+        description: "Your application is being reviewed by the facility verifier.",
+        step: 1,
+    },
+    REJECTED_BY_VERIFIER: {
+        label: "Rejected by Verifier",
+        color: "#dc2626",
+        bg: "#fef2f2",
+        border: "#fecaca",
+        description: "Your application was rejected by the verifier. Please check your email for the reason.",
+        step: 1,
+    },
+    PENDING_OPERATOR: {
+        label: "Pending Operator Action",
+        color: "#2563eb",
+        bg: "#eff6ff",
+        border: "#bfdbfe",
+        description: "Verification complete. Forwarded to the operator for CSC portal submission.",
+        step: 2,
+    },
+    APPLIED_ON_CSC: {
+        label: "Applied on CSC Portal",
+        color: "#7c3aed",
+        bg: "#f5f3ff",
+        border: "#ddd6fe",
+        description: "The operator has submitted your application on the CSC portal. Processing in progress.",
+        step: 3,
+    },
+    REJECTED_BY_OPERATOR: {
+        label: "Rejected by Operator",
+        color: "#dc2626",
+        bg: "#fef2f2",
+        border: "#fecaca",
+        description: "Your application could not be processed. Check your email for details.",
+        step: 2,
+    },
+    COMPLETED: {
+        label: "Certificate Ready",
+        color: "#16a34a",
+        bg: "#f0fdf4",
+        border: "#bbf7d0",
+        description: "Your birth certificate is ready! Download it below.",
+        step: 4,
+    },
+};
