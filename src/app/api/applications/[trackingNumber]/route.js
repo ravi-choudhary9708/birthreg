@@ -1,22 +1,28 @@
 import { NextResponse } from "next/server";
-import dbConnect from "@/libs/dbConnect";
-import { Application } from "@/models/application.model";
+import prisma from "@/libs/prisma";
 import { apiResponse } from "@/utils/apiResponse";
 import { apiError } from "@/utils/apiError";
 
 export async function GET(request, { params }) {
     try {
-        await dbConnect();
-
         const { trackingNumber } = await params;
 
         if (!trackingNumber) {
             throw new apiError(400, "Tracking number is required");
         }
 
-        const application = await Application.findOne({
-            applicationNumber: trackingNumber.toUpperCase(),
-        }).select("-__v");
+        const application = await prisma.application.findUnique({
+            where: {
+                applicationNumber: trackingNumber.toUpperCase(),
+            },
+            include: {
+                child: {
+                    select: {
+                        name: true,
+                    }
+                }
+            }
+        });
 
         if (!application) {
             throw new apiError(404, "No application found with this tracking number");
@@ -40,9 +46,16 @@ export async function GET(request, { params }) {
         );
 
     } catch (error) {
+        console.error("Tracking API Error:", error.message || error);
+        if (error.code === "ECONNREFUSED" || error.message?.includes("ECONNREFUSED")) {
+            return NextResponse.json(
+                { success: false, message: "Database is unreachable. Please ensure the PostgreSQL server is running and accessible." },
+                { status: 503 }
+            );
+        }
         const statusCode = error.statusCode || 500;
         return NextResponse.json(
-            { success: false, message: error.message },
+            { success: false, message: error.message || "An internal error occurred" },
             { status: statusCode }
         );
     }

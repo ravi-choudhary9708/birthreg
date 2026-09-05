@@ -1,0 +1,169 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  verifier
+  operator
+}
+
+enum ApplicationStatus {
+  PENDING_VERIFIER
+  REJECTED_BY_VERIFIER
+  PENDING_OPERATOR
+  APPLIED_ON_CRS
+  APPLIED_ON_CSC
+  REJECTED_BY_OPERATOR
+  COMPLETED
+}
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  username  String   @unique
+  role      String   // "verifier" | "operator"
+  facility  String
+  password  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([username])
+  @@index([facility])
+  @@map("cert_users")
+}
+
+model Application {
+  id                String            @id @default(uuid()) @db.Uuid
+  applicationNumber String            @unique @map("application_number")
+  facility          String
+  status            ApplicationStatus @default(PENDING_VERIFIER)
+  certificateUrl    String?           @map("certificate_url")
+  remarks           String?           @db.Text
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  child             ChildDetail?
+  parents           ParentDetail?
+  informant         InformantDetail?
+
+  @@index([facility])
+  @@index([status])
+  @@index([createdAt])
+  @@map("applications")
+}
+
+model ChildDetail {
+  id                String      @id @default(uuid()) @db.Uuid
+  applicationId     String      @unique @map("application_id") @db.Uuid
+  application       Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  name              String
+  dateOfBirth       DateTime    @map("date_of_birth")
+  gender            String
+  adharNumber       String?     @map("adhar_number")
+  weight            Float?
+  deliveryAttention String?     @map("delivery_attention")
+  deliveryMethod    String?     @map("delivery_method")
+  pregnancyDuration Int?        @map("pregnancy_duration")
+  placeOfBirth      String      @map("place_of_birth")
+
+  // Birth Place Address
+  birthPlotNumber   String?     @map("birth_plot_number")
+  birthMohalla      String?     @map("birth_mohalla")
+  birthVillage      String      @map("birth_village")
+  birthWardNumber   String?     @map("birth_ward_number")
+  birthSubDistrict  String      @map("birth_sub_district")
+  birthDistrict     String      @map("birth_district")
+  birthState        String      @map("birth_state")
+  birthPinCode      String      @map("birth_pin_code")
+
+  @@map("child_details")
+}
+
+model ParentDetail {
+  id                   String      @id @default(uuid()) @db.Uuid
+  applicationId        String      @unique @map("application_id") @db.Uuid
+  application          Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  // Mother
+  motherName           String      @map("mother_name")
+  motherAdhar          String      @map("mother_adhar")
+  motherMobile         String      @map("mother_mobile")
+  motherEmail          String?     @map("mother_email")
+
+  // Father
+  fatherName           String      @map("father_name")
+  fatherAdhar          String      @map("father_adhar")
+  fatherMobile         String      @map("father_mobile")
+  fatherEmail          String?     @map("father_email")
+
+  // Present Address
+  presentPlotNumber    String?     @map("present_plot_number")
+  presentMohalla       String?     @map("present_mohalla")
+  presentVillage       String      @map("present_village")
+  presentWardNumber    String?     @map("present_ward_number")
+  presentSubDistrict   String      @map("present_sub_district")
+  presentDistrict      String      @map("present_district")
+  presentState         String      @map("present_state")
+  presentPinCode       String      @map("present_pin_code")
+
+  // Permanent Address
+  permPlotNumber       String?     @map("perm_plot_number")
+  permMohalla          String?     @map("perm_mohalla")
+  permVillage          String      @map("perm_village")
+  permWardNumber       String?     @map("perm_ward_number")
+  permSubDistrict      String      @map("perm_sub_district")
+  permDistrict         String      @map("perm_district")
+  permState            String      @map("perm_state")
+  permPinCode          String      @map("perm_pin_code")
+
+  @@map("parent_details")
+}
+
+model InformantDetail {
+  id                   String      @id @default(uuid()) @db.Uuid
+  applicationId        String      @unique @map("application_id") @db.Uuid
+  application          Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  name                 String
+  adharNumber          String?     @map("adhar_number")
+  mobileNumber         String      @map("mobile_number")
+  email                String?
+  providedInformation  Boolean     @default(false) @map("provided_information")
+
+  // Informant Address
+  informantPlotNumber  String?     @map("informant_plot_number")
+  informantVillage     String      @map("informant_village")
+  informantWardNumber  String?     @map("informant_ward_number")
+  informantSubDistrict String      @map("informant_sub_district")
+  informantDistrict    String      @map("informant_district")
+  informantState       String      @map("informant_state")
+  informantPinCode     String      @map("informant_pin_code")
+
+  // Mother Address at Birth
+  motherCity           String      @map("mother_city")
+  motherSubDistrict    String      @map("mother_sub_district")
+  motherDistrict       String      @map("mother_district")
+  motherState          String      @map("mother_state")
+  motherPinCode        String      @map("mother_pin_code")
+
+  // Socio-economic / Statistical
+  motherReligion       String      @map("mother_religion")
+  fatherReligion       String      @map("father_religion")
+  motherLiteracy       String?     @map("mother_literacy")
+  fatherLiteracy       String?     @map("father_literacy")
+  motherProfession     String?     @map("mother_profession")
+  fatherProfession     String?     @map("father_profession")
+  motherAgeAtMirrage   Int?        @map("mother_age_at_marriage")
+  motherAgeAtChildBirth Int?       @map("mother_age_at_child_birth")
+  motherChildNumber    Int?        @map("mother_child_number")
+  relationToChild      String?     @map("relation_to_child")
+  declarationAccepted  Boolean     @default(false) @map("declaration_accepted")
+
+  @@map("informant_details")
+}

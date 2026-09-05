@@ -1,36 +1,37 @@
 import { NextResponse } from "next/server";
-import dbConnect from "@/libs/dbConnect";
-import { User } from "@/models/user.model";
+import prisma from "@/libs/prisma";
+import { verifyPassword } from "@/libs/auth";
 import { signToken } from "@/libs/jwt";
 import { apiResponse } from "@/utils/apiResponse";
 import { apiError } from "@/utils/apiError";
 
 export async function POST(request) {
     try {
-        await dbConnect();
-
         const { username, password } = await request.json();
 
         if (!username || !password) {
             throw new apiError(400, "Username and password are required");
         }
 
-        // Find user by username
-        const user = await User.findOne({ username: username.toLowerCase().trim() });
+        // Find user by username in PostgreSQL
+        const user = await prisma.user.findUnique({
+            where: { username: username.toLowerCase().trim() }
+        });
 
         if (!user) {
             throw new apiError(401, "Invalid username or password");
         }
 
         // Verify password
-        const isPasswordValid = await user.isPasswordCorrect(password);
+        const isPasswordValid = await verifyPassword(password, user.password);
         if (!isPasswordValid) {
             throw new apiError(401, "Invalid username or password");
         }
 
         // Generate JWT token
         const token = signToken({
-            _id: user._id.toString(),
+            _id: user.id,
+            id: user.id,
             username: user.username,
             role: user.role,
             facility: user.facility,

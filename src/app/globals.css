@@ -90,3 +90,111 @@ input:focus, select:focus, textarea:focus {
   animation: spin 0.8s linear infinite;
   display: inline-block;
 }
+
+/* Responsive Grid Helpers */
+.resp-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+@media (max-width: 640px) {
+  .resp-grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 14px;
+  }
+}
+
+.resp-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+@media (max-width: 768px) {
+  .resp-grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 14px;
+  }
+}
+@media (max-width: 480px) {
+  .resp-grid-4 {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+}
+
+/* Mobile Touch & Accessibility */
+@media (max-width: 640px) {
+  input, select, textarea {
+    font-size: 15px !important;
+  }
+}
+
+/* Table scroll wrapper */
+.table-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table-scroll-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+.table-scroll-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* Infinite Marquee Showcase */
+@keyframes marqueeLeft {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes marqueeRight {
+  0% {
+    transform: translate3d(-50%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.marquee-track-left {
+  display: flex;
+  gap: 12px;
+  width: max-content;
+  animation: marqueeLeft 50s linear infinite;
+  will-change: transform;
+}
+
+.marquee-track-right {
+  display: flex;
+  gap: 12px;
+  width: max-content;
+  animation: marqueeRight 50s linear infinite;
+  will-change: transform;
+}
+
+.marquee-wrapper:hover .marquee-track-left,
+.marquee-wrapper:hover .marquee-track-right {
+  animation-play-state: paused;
+}
+
+.marquee-mask {
+  mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent 100%);
+}
+
+/* Facility Card Interactive Hover */
+.fac-card-interactive {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+
+.fac-card-interactive:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.09), 0 6px 12px -4px rgba(0, 0, 0, 0.04);
+}
+

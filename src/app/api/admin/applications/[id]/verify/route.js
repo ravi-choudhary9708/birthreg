@@ -1,50 +1,74 @@
 import { NextResponse } from "next/server";
-import dbConnect from "@/libs/dbConnect";
-import { Application } from "@/models/application.model";
+import prisma from "@/libs/prisma";
+import { applicationIncludeRelations } from "@/libs/applicationSerializer";
 import { sendStatusUpdateEmail } from "@/libs/mailer";
 import { apiResponse } from "@/utils/apiResponse";
 import { apiError } from "@/utils/apiError";
 
 export async function PATCH(request, { params }) {
     try {
-        await dbConnect();
-
         const role = request.headers.get("x-user-role");
-        if (role !== "verifier") {
-            throw new apiError(403, "Only verifiers can perform this action");
+        const userFacility = request.headers.get("x-user-facility");
+
+        if (role !== "verifier" && role !== "operator") {
+            throw new apiError(403, "Only verifiers or authorized operators can perform this action");
         }
 
         const { id } = await params;
-        const { action, remarks } = await request.json(); // action: "approve" | "reject"
+        const { action, remarks, applyCrs } = await request.json(); // action: "approve" | "reject"
 
         if (!action || !["approve", "reject"].includes(action)) {
             throw new apiError(400, "Invalid action. Use 'approve' or 'reject'");
         }
-        if (action === "reject" && !remarks) {
-            throw new apiError(400, "Remarks are required when rejecting an application");
+        if (action === "reject" && (!remarks || remarks.trim() === "")) {
+            throw new apiError(400, "A valid reason is strictly required when rejecting an application");
         }
 
-        const application = await Application.findById(id);
+        const application = await prisma.application.findUnique({
+            where: { id },
+            include: applicationIncludeRelations,
+        });
+
         if (!application) {
             throw new apiError(404, "Application not found");
         }
+
+        // Verifier facility isolation: verifiers can only process applications for their own hospital
+        if (role === "verifier" && application.facility && userFacility) {
+            if (application.facility.trim().toLowerCase() !== userFacility.trim().toLowerCase()) {
+                throw new apiError(403, `You are only authorized for ${userFacility}, not ${application.facility}`);
+            }
+        }
+
         if (application.status !== "PENDING_VERIFIER") {
             throw new apiError(400, "This application is not pending verification");
         }
 
-        const newStatus = action === "approve" ? "PENDING_OPERATOR" : "REJECTED_BY_VERIFIER";
-        application.status = newStatus;
-        if (remarks) application.remarks = remarks;
-        await application.save();
+        let newStatus = "PENDING_OPERATOR"; // Default approved state (Ready for CRS submission)
+        if (action === "reject") {
+            newStatus = "REJECTED_BY_VERIFIER";
+        } else if (applyCrs) {
+            newStatus = "APPLIED_ON_CRS";
+        }
+
+        await prisma.application.update({
+            where: { id },
+            data: {
+                status: newStatus,
+                ...(remarks ? { remarks: remarks.trim() } : {}),
+            },
+        });
 
         // Send email notification
-        if (application.informationProvider?.email) {
+        if (application.informant?.email) {
             await sendStatusUpdateEmail({
-                parentEmail: application.informationProvider.email,
-                parentName: application.informationProvider.name,
+                parentEmail: application.informant.email,
+                parentName: application.informant.name,
                 applicationNumber: application.applicationNumber,
                 status: newStatus,
-                remarks,
+                childName: application.child?.name,
+                facility: application.facility,
+                remarks: remarks?.trim(),
             }).catch(console.error);
         }
 

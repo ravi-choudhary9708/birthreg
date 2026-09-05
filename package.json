@@ -6,23 +6,35 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "seed": "tsx seed.js",
+    "seed:samples": "tsx seed-sample-applications.js",
     "lint": "eslint"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.10.1",
     "dotenv": "^17.4.2",
+    "firebase": "^12.18.0",
+    "gsap": "^3.15.0",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.9.4",
+    "lenis": "^1.3.26",
+    "lucide-react": "^1.41.0",
     "next": "16.3.3",
     "nodemailer": "^9.0.5",
+    "pg": "^8.23.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "recharts": "^3.10.1",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
-    "tailwindcss": "^4"
+    "prisma": "^7.10.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.13"
   }
 }

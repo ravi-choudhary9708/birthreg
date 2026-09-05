@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import dbConnect from "@/libs/dbConnect";
-import { Application } from "@/models/application.model";
+import prisma from "@/libs/prisma";
+import { applicationIncludeRelations } from "@/libs/applicationSerializer";
 import { uploadCertificate } from "@/libs/cloudinary";
 import { sendStatusUpdateEmail } from "@/libs/mailer";
 import { apiResponse } from "@/utils/apiResponse";
@@ -8,21 +8,34 @@ import { apiError } from "@/utils/apiError";
 
 export async function POST(request, { params }) {
     try {
-        await dbConnect();
-
         const role = request.headers.get("x-user-role");
-        if (role !== "operator") {
-            throw new apiError(403, "Only operators can upload certificates");
+        const userFacility = request.headers.get("x-user-facility");
+
+        if (role !== "verifier" && role !== "operator") {
+            throw new apiError(403, "Only verifiers or authorized operators can upload certificates");
         }
 
         const { id } = await params;
 
-        const application = await Application.findById(id);
+        const application = await prisma.application.findUnique({
+            where: { id },
+            include: applicationIncludeRelations,
+        });
+
         if (!application) {
             throw new apiError(404, "Application not found");
         }
-        if (application.status !== "APPLIED_ON_CSC" && application.status !== "COMPLETED") {
-            throw new apiError(400, "Certificate can only be uploaded after applying on CSC portal");
+
+        // Verifier facility isolation: verifiers can only upload certificates for their own hospital
+        if (role === "verifier" && application.facility && userFacility) {
+            if (application.facility.trim().toLowerCase() !== userFacility.trim().toLowerCase()) {
+                throw new apiError(403, `You are only authorized for ${userFacility}, not ${application.facility}`);
+            }
+        }
+
+        const allowedStatuses = ["APPLIED_ON_CRS", "APPLIED_ON_CSC", "PENDING_OPERATOR", "COMPLETED"];
+        if (!allowedStatuses.includes(application.status)) {
+            throw new apiError(400, "Certificate can only be uploaded after the application has been verified or registered on CRS");
         }
 
         // Parse multipart form data
@@ -52,18 +65,27 @@ export async function POST(request, { params }) {
 
         const { url } = await uploadCertificate(buffer, application.applicationNumber, extension);
 
-        // Update application
-        application.status = "COMPLETED";
-        application.certificateUrl = url;
-        await application.save();
+        // Update application in PostgreSQL
+        await prisma.application.update({
+            where: { id },
+            data: {
+                status: "COMPLETED",
+                certificateUrl: url,
+            }
+        });
 
-        // Send completion email
-        if (application.informationProvider?.email) {
+        // Send completion email with certificate attached
+        if (application.informant?.email) {
             await sendStatusUpdateEmail({
-                parentEmail: application.informationProvider.email,
-                parentName: application.informationProvider.name,
+                parentEmail: application.informant.email,
+                parentName: application.informant.name,
                 applicationNumber: application.applicationNumber,
                 status: "COMPLETED",
+                childName: application.child?.name,
+                facility: application.facility,
+                certificateUrl: url,
+                certificateBuffer: buffer,
+                certificateExtension: extension,
             }).catch(console.error);
         }
 

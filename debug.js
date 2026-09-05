@@ -1,21 +1,36 @@
 require('dotenv').config({ path: '.env.local' });
-const mongoose = require('mongoose');
+const { PrismaClient } = require('./src/generated/prisma/client');
+const { PrismaPg } = require('@prisma/adapter-pg');
+const pg = require('pg');
 
 async function run() {
-    await mongoose.connect(process.env.MONGODB_URI);
-    console.log("Connected to MongoDB");
-    const db = mongoose.connection.db;
-    const collections = await db.listCollections().toArray();
-    console.log("Collections:", collections.map(c => c.name));
-    
-    const User = mongoose.model('User', new mongoose.Schema({}, { strict: false }));
-    const users = await User.find({}).limit(5);
-    console.log("First 5 users:");
-    users.forEach(u => console.log(u.username, u.role, u.facility));
-    
-    const operator = await User.findOne({ username: 'operator_central' });
-    console.log("operator_central exists?", !!operator);
-    
-    process.exit(0);
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+        console.error("❌ DATABASE_URL is not defined in .env.local or .env");
+        process.exit(1);
+    }
+
+    const pool = new pg.Pool({ connectionString });
+    const adapter = new PrismaPg(pool);
+    const prisma = new PrismaClient({ adapter });
+
+    try {
+        console.log("Connecting to PostgreSQL...");
+        const userCount = await prisma.user.count();
+        const appCount = await prisma.application.count();
+        console.log(`✅ Connected successfully! Users: ${userCount}, Applications: ${appCount}`);
+
+        const sampleUsers = await prisma.user.findMany({ take: 5 });
+        console.log("Sample users:");
+        sampleUsers.forEach(u => console.log(`- ${u.username} (${u.role}) - ${u.facility}`));
+
+        await pool.end();
+        process.exit(0);
+    } catch (err) {
+        console.error("❌ Database connection error:", err.message);
+        await pool.end();
+        process.exit(1);
+    }
 }
+
 run();

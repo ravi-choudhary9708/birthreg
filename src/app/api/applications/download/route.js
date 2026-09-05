@@ -1,22 +1,28 @@
 import { NextResponse } from "next/server";
-import dbConnect from "@/libs/dbConnect";
-import { Application } from "@/models/application.model";
+import prisma from "@/libs/prisma";
 import { apiResponse } from "@/utils/apiResponse";
 import { apiError } from "@/utils/apiError";
 
-// Secure download: requires both applicationNumber (via route) and DOB (via body)
+// Secure download: requires both applicationNumber and DOB matching record
 export async function POST(request) {
     try {
-        await dbConnect();
-
         const { applicationNumber, dateOfBirth } = await request.json();
 
         if (!applicationNumber || !dateOfBirth) {
             throw new apiError(400, "Application Number and Date of Birth are required");
         }
 
-        const application = await Application.findOne({
-            applicationNumber: applicationNumber.toUpperCase(),
+        const application = await prisma.application.findUnique({
+            where: {
+                applicationNumber: applicationNumber.toUpperCase(),
+            },
+            include: {
+                child: {
+                    select: {
+                        dateOfBirth: true,
+                    }
+                }
+            }
         });
 
         if (!application) {

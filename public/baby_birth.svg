@@ -1,0 +1,60 @@
+<svg viewBox="0 0 512 512" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Bihar Bodhi Leaf Gradient -->
+    <linearGradient id="leafGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4CAF50"/>
+      <stop offset="100%" stop-color="#2E7D32"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer Government Seal (Madhubani geometric border style) -->
+  <circle cx="256" cy="256" r="240" fill="#FDFBF7" stroke="#E65100" stroke-width="16" />
+  <circle cx="256" cy="256" r="215" fill="none" stroke="#E65100" stroke-width="8" stroke-dasharray="12, 12" />
+
+  <!-- Madhubani Lotus Base (Symbolizing birth and purity) -->
+  <path d="M 156 380 C 156 380, 206 320, 256 320 C 306 320, 356 380, 356 380 C 356 380, 306 440, 256 440 C 206 440, 156 380, 156 380 Z" fill="#FF1744" stroke="#880E4F" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M 96 340 C 96 340, 166 290, 256 320 C 256 320, 166 400, 96 340 Z" fill="#FF8A80" stroke="#880E4F" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M 416 340 C 416 340, 346 290, 256 320 C 256 320, 346 400, 416 340 Z" fill="#FF8A80" stroke="#880E4F" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M 156 380 C 206 350, 256 320, 256 320" fill="none" stroke="#880E4F" stroke-width="4" stroke-dasharray="6, 6"/>
+  <path d="M 356 380 C 306 350, 256 320, 256 320" fill="none" stroke="#880E4F" stroke-width="4" stroke-dasharray="6, 6"/>
+
+  <!-- Bodhi Leaf (Official Bihar Emblem) emerging from the Lotus -->
+  <path d="M 256 60 C 256 140, 370 170, 350 260 C 330 350, 256 340, 256 310 C 256 340, 182 350, 162 260 C 142 170, 256 140, 256 60 Z" fill="url(#leafGrad)" stroke="#1B5E20" stroke-width="10" stroke-linejoin="round"/>
+  
+  <!-- Double line inside the leaf (Signature Madhubani style trait) -->
+  <path d="M 256 90 C 256 150, 350 180, 330 255 C 315 310, 260 310, 256 295 C 252 310, 197 310, 182 255 C 162 180, 256 150, 256 90 Z" fill="none" stroke="#C8E6C9" stroke-width="4" stroke-dasharray="8, 8"/>
+  <line x1="256" y1="310" x2="256" y2="120" stroke="#1B5E20" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Left Fish (Madhubani Fertility Motif) -->
+  <path d="M 140 256 C 120 220, 70 230, 60 256 C 70 282, 120 292, 140 256 Z" fill="#FFC107" stroke="#E65100" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M 60 256 L 30 230 L 40 256 L 30 282 Z" fill="#FFC107" stroke="#E65100" stroke-width="6" stroke-linejoin="round"/>
+  <circle cx="115" cy="250" r="4" fill="#880E4F"/>
+  <path d="M 125 242 C 110 240, 90 245, 80 256 C 90 267, 110 272, 125 270" fill="none" stroke="#E65100" stroke-width="3" stroke-dasharray="4,4"/>
+
+  <!-- Right Fish (Madhubani Fertility Motif) -->
+  <path d="M 372 256 C 392 220, 442 230, 452 256 C 442 282, 392 292, 372 256 Z" fill="#FFC107" stroke="#E65100" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M 452 256 L 482 230 L 472 256 L 482 282 Z" fill="#FFC107" stroke="#E65100" stroke-width="6" stroke-linejoin="round"/>
+  <circle cx="397" cy="250" r="4" fill="#880E4F"/>
+  <path d="M 387 242 C 402 240, 422 245, 432 256 C 422 267, 402 272, 387 270" fill="none" stroke="#E65100" stroke-width="3" stroke-dasharray="4,4"/>
+
+  <!-- Newborn Baby Footprints (Birth portal icon) -->
+  <!-- Left foot -->
+  <path d="M 230 220 C 215 220, 210 245, 215 260 C 220 275, 235 275, 240 260 C 245 245, 245 220, 230 220 Z" fill="#FDFBF7"/>
+  <circle cx="242" cy="205" r="5" fill="#FDFBF7"/>
+  <circle cx="232" cy="200" r="4" fill="#FDFBF7"/>
+  <circle cx="224" cy="202" r="3.5" fill="#FDFBF7"/>
+  <circle cx="218" cy="206" r="3" fill="#FDFBF7"/>
+  <circle cx="214" cy="212" r="2.5" fill="#FDFBF7"/>
+
+  <!-- Right foot -->
+  <path d="M 282 220 C 297 220, 302 245, 297 260 C 292 275, 277 275, 272 260 C 267 245, 267 220, 282 220 Z" fill="#FDFBF7"/>
+  <circle cx="270" cy="205" r="5" fill="#FDFBF7"/>
+  <circle cx="280" cy="200" r="4" fill="#FDFBF7"/>
+  <circle cx="288" cy="202" r="3.5" fill="#FDFBF7"/>
+  <circle cx="294" cy="206" r="3" fill="#FDFBF7"/>
+  <circle cx="298" cy="212" r="2.5" fill="#FDFBF7"/>
+  
+  <!-- Swastikas (Official Bihar Emblem details) -->
+  <path d="M 105 105 L 105 120 L 135 120 L 135 135 M 135 105 L 120 105 L 120 135 L 105 135" fill="none" stroke="#E65100" stroke-width="6"/>
+  <path d="M 377 105 L 377 120 L 407 120 L 407 135 M 407 105 L 392 105 L 392 135 L 377 135" fill="none" stroke="#E65100" stroke-width="6"/>
+</svg>
