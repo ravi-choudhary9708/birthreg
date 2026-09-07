@@ -82,7 +82,7 @@ export async function sendApplicationReceivedEmail({
     dateOfBirth,
     gender,
 }) {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const baseUrl = process.env.BASE_URL || "http://localhost:3000";
     const trackingUrl = `${baseUrl}/track/${applicationNumber}`;
     const todayFormatted = formatDate(new Date());
 
@@ -231,7 +231,7 @@ export async function sendStatusUpdateEmail({
     certificateBuffer,
     certificateExtension,
 }) {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const baseUrl = process.env.BASE_URL || "http://localhost:3000";
     const trackingUrl = `${baseUrl}/track/${applicationNumber}`;
     const todayFormatted = formatDate(new Date());
 
@@ -500,7 +500,7 @@ export async function sendTrackingOtpEmail({
     applicantName,
     facility,
 }) {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const baseUrl = process.env.BASE_URL || "http://localhost:3000";
     const todayFormatted = formatDate(new Date());
 
     const htmlContent = `
