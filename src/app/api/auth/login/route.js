@@ -54,9 +54,10 @@ export async function POST(request) {
         return response;
 
     } catch (error) {
+        console.error("Login API Error:", error.message || error);
         const statusCode = error.statusCode || 500;
         return NextResponse.json(
-            { success: false, message: error.message, errors: error.errors || [] },
+            { success: false, message: error.message || "An error occurred during login", errors: error.errors || [] },
             { status: statusCode }
         );
     }
