@@ -21,9 +21,11 @@ function createPrismaClient() {
         connectionTimeoutMillis: 5000,
     };
 
-    // Disable SSL for local database unless explicitly required
+    // Configure SSL: disable for local Postgres unless explicitly required; enable with rejectUnauthorized: false for cloud DBs (Neon, Supabase, Render, etc.)
     if (isLocalhost && !connectionString.includes("sslmode=require") && !connectionString.includes("sslmode=verify-full")) {
         poolConfig.ssl = false;
+    } else {
+        poolConfig.ssl = { rejectUnauthorized: false };
     }
 
     const pool = new pg.Pool(poolConfig);
