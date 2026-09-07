@@ -361,8 +361,18 @@ export default function VerifierDashboard() {
           </button>
         </div>
       </div>
-
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "clamp(20px, 3vw, 28px) clamp(14px, 2.5vw, 24px)" }}>
+      {/* Main Content Area */}
+      <main
+        id="main-content"
+        tabIndex={-1}
+        style={{
+          maxWidth: 1200,
+          margin: "0 auto",
+          padding: "clamp(20px, 3vw, 28px) clamp(14px, 2.5vw, 24px)",
+          scrollMarginTop: "90px",
+          outline: "none",
+        }}
+      >
         {/* Header */}
         <div className="anim-ver-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
           <div>
@@ -739,7 +749,7 @@ export default function VerifierDashboard() {
             </div>
           </div>
         )}
-      </div>
+      </main>
 
       {/* ========================================================================= */}
       {/* MODAL 1: VIEW APPLICATION FULL DETAILS & ACTIONS */}

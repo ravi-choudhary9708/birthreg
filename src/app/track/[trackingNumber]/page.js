@@ -326,6 +326,8 @@ export default function TrackDetailPage({ params }) {
       <div style={{ maxWidth: 700, margin: "0 auto", padding: "clamp(20px, 4vw, 32px) clamp(14px, 3vw, 24px)" }}>
         {/* Application Header */}
         <div
+          id="main-content"
+          tabIndex={-1}
           className="anim-app-card"
           style={{
             background: "white",
@@ -334,6 +336,8 @@ export default function TrackDetailPage({ params }) {
             padding: "clamp(20px, 4vw, 28px)",
             marginBottom: 20,
             boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
+            scrollMarginTop: "90px",
+            outline: "none",
           }}
         >
           <div
@@ -346,19 +350,55 @@ export default function TrackDetailPage({ params }) {
             }}
           >
             <div>
-              <div
-                style={{
-                  display: "inline-block",
-                  padding: "2px 8px",
-                  background: "#dbeafe",
-                  borderRadius: 4,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: "#1e40af",
-                  marginBottom: 6,
-                }}
-              >
-                Government of Bihar • Madhubani
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                <div
+                  style={{
+                    display: "inline-block",
+                    padding: "2px 8px",
+                    background: "#dbeafe",
+                    borderRadius: 4,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "#1e40af",
+                  }}
+                >
+                  Government of Bihar • Madhubani
+                </div>
+                {data.isVerified ? (
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "2px 8px",
+                      background: "#f0fdf4",
+                      border: "1px solid #bbf7d0",
+                      borderRadius: 4,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "#16a34a",
+                    }}
+                  >
+                    ✓ 6-Digit Email OTP Verified
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "2px 8px",
+                      background: "#fffbeb",
+                      border: "1px solid #fde68a",
+                      borderRadius: 4,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "#92400e",
+                    }}
+                  >
+                    🔒 OTP Verification Required
+                  </div>
+                )}
               </div>
               <p
                 style={{
@@ -412,6 +452,50 @@ export default function TrackDetailPage({ params }) {
               {config.description}
             </p>
           </div>
+
+          {!data.isVerified && (
+            <div
+              style={{
+                marginTop: 16,
+                padding: "14px 16px",
+                background: "#fffbeb",
+                border: "1px solid #fde68a",
+                borderRadius: 10,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 12,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#92400e" }}>
+                  🔒 Identity Verification Required
+                </p>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: "#b45309", lineHeight: 1.4 }}>
+                  Verify your identity using the 6-digit OTP sent to your linked email address to unlock certificate downloads and full records.
+                </p>
+              </div>
+              <Link
+                href={`/track?app=${data.applicationNumber}`}
+                style={{
+                  padding: "8px 16px",
+                  background: "#1e40af",
+                  color: "white",
+                  borderRadius: 8,
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Verify with Email OTP →
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Timeline */}

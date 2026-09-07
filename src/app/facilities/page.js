@@ -941,7 +941,12 @@ export default function FacilitiesPage() {
       </header>
 
       {/* Main Content Area */}
-      <main style={{ flex: 1, padding: "clamp(20px, 3.5vw, 40px) clamp(16px, 3vw, 28px)" }}>
+      <main
+        style={{
+          flex: 1,
+          padding: "clamp(20px, 3.5vw, 40px) clamp(16px, 3vw, 28px)",
+        }}
+      >
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           
           {/* Breadcrumb */}
@@ -1236,6 +1241,8 @@ export default function FacilitiesPage() {
 
           {/* Interactive Search & Filter Controls */}
           <div
+            id="main-content"
+            tabIndex={-1}
             className="anim-fac-filters"
             style={{
               background: "white",
@@ -1244,6 +1251,8 @@ export default function FacilitiesPage() {
               border: "1px solid #e2e8f0",
               boxShadow: "0 2px 5px rgba(0,0,0,0.03)",
               marginBottom: 24,
+              scrollMarginTop: "90px",
+              outline: "none",
             }}
           >
             <div

@@ -114,7 +114,12 @@ export default function LoginPage() {
       }}
     >
       <style>{styles}</style>
-      <div style={{ maxWidth: 420, width: "100%" }}>
+      <div
+        style={{
+          maxWidth: 420,
+          width: "100%",
+        }}
+      >
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <Link href="/">
@@ -170,6 +175,8 @@ export default function LoginPage() {
 
         {/* Form Card */}
         <div
+          id="main-content"
+          tabIndex={-1}
           className="anim-login-card"
           style={{
             background: "white",
@@ -177,6 +184,8 @@ export default function LoginPage() {
             borderRadius: 20,
             padding: "clamp(24px, 6vw, 36px) clamp(18px, 5vw, 32px)",
             boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
+            scrollMarginTop: "90px",
+            outline: "none",
           }}
         >
           <form onSubmit={handleSubmit}>

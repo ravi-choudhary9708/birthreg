@@ -258,7 +258,13 @@
 }
 
 
-/* --- 2. Live Page Font Resizing (Applies cleanly to Main Content) --- */
+/* --- 2. Main Content Target & Live Page Font Resizing --- */
+#main-content,
+#main-feature {
+  scroll-margin-top: 80px;
+  outline: none;
+}
+
 html.a11y-font-large #main-section {
   zoom: 1.1;
 }

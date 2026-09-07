@@ -609,6 +609,7 @@ export default function HomePage() {
 
       {/* Hero Section */}
       <section
+        aria-label="Birth Certificate Online Portal Hero"
         style={{
           padding: "clamp(48px, 8vw, 72px) clamp(16px, 4vw, 24px)",
           textAlign: "center",
@@ -676,75 +677,86 @@ export default function HomePage() {
             </span>
           </div>
 
-          <h1
-            className="anim-hero-title"
-            style={{
-              fontSize: "clamp(28px, 6vw, 52px)",
-              fontWeight: 800,
-              color: "#111827",
-              lineHeight: 1.15,
-              marginBottom: 18,
-            }}
-          >
-            Birth Certificate
-            <br />
-            <span style={{ color: "#1e40af" }}>Online Portal</span>
-          </h1>
-
-          <p
-            className="anim-hero-desc"
-            style={{
-              fontSize: "clamp(15px, 2.5vw, 18px)",
-              color: "#6b7280",
-              lineHeight: 1.7,
-              marginBottom: 36,
-            }}
-          >
-            Official civil registration initiative by the Government of Bihar
-            for Madhubani District. Apply for a birth certificate from hospital
-            or home, track progress in real-time, and download your verified
-            certificate securely.
-          </p>
-
+          {/* Main Portal Feature & Action Hub */}
           <div
-            className="hero-cta-group"
+            id="main-content"
+            tabIndex={-1}
             style={{
-              display: "flex",
-              gap: 14,
-              justifyContent: "center",
-              flexWrap: "wrap",
+              scrollMarginTop: "90px",
+              outline: "none",
             }}
           >
-            <Link
-              href="/apply"
-              className="hero-btn-primary anim-hero-btn"
+            <h1
+              className="anim-hero-title"
               style={{
-                padding: "14px 32px",
-                background: "#1e40af",
-                color: "white",
-                borderRadius: 10,
-                fontWeight: 700,
-                fontSize: 16,
-                boxShadow: "0 4px 14px rgba(30,64,175,0.3)",
+                fontSize: "clamp(28px, 6vw, 52px)",
+                fontWeight: 800,
+                color: "#111827",
+                lineHeight: 1.15,
+                marginBottom: 18,
               }}
             >
-              Apply for Certificate →
-            </Link>
-            <Link
-              href="/track"
-              className="hero-btn-secondary anim-hero-btn"
+              Birth Certificate
+              <br />
+              <span style={{ color: "#1e40af" }}>Online Portal</span>
+            </h1>
+
+            <p
+              className="anim-hero-desc"
               style={{
-                padding: "14px 32px",
-                background: "white",
-                color: "#1e40af",
-                border: "1.5px solid #bfdbfe",
-                borderRadius: 10,
-                fontWeight: 600,
-                fontSize: 16,
+                fontSize: "clamp(15px, 2.5vw, 18px)",
+                color: "#6b7280",
+                lineHeight: 1.7,
+                marginBottom: 36,
               }}
             >
-              Track My Application
-            </Link>
+              Official civil registration initiative by the Government of Bihar
+              for Madhubani District. Apply for a birth certificate from hospital
+              or home, track progress in real-time, and download your verified
+              certificate securely.
+            </p>
+
+            <div
+              id="main-feature"
+              className="hero-cta-group"
+              style={{
+                display: "flex",
+                gap: 14,
+                justifyContent: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <Link
+                href="/apply"
+                className="hero-btn-primary anim-hero-btn"
+                style={{
+                  padding: "14px 32px",
+                  background: "#1e40af",
+                  color: "white",
+                  borderRadius: 10,
+                  fontWeight: 700,
+                  fontSize: 16,
+                  boxShadow: "0 4px 14px rgba(30,64,175,0.3)",
+                }}
+              >
+                Apply for Certificate →
+              </Link>
+              <Link
+                href="/track"
+                className="hero-btn-secondary anim-hero-btn"
+                style={{
+                  padding: "14px 32px",
+                  background: "white",
+                  color: "#1e40af",
+                  border: "1.5px solid #bfdbfe",
+                  borderRadius: 10,
+                  fontWeight: 600,
+                  fontSize: 16,
+                }}
+              >
+                Track My Application
+              </Link>
+            </div>
           </div>
         </div>
       </section>

@@ -914,7 +914,16 @@ function ApplyFormContent({ facParam }) {
         }}
       >
         {/* Section 1: Facility Selection */}
-        <div className="anim-apply-section" style={sectionStyle}>
+        <div
+          id="main-content"
+          tabIndex={-1}
+          className="anim-apply-section"
+          style={{
+            ...sectionStyle,
+            scrollMarginTop: "90px",
+            outline: "none",
+          }}
+        >
           <div style={sectionHeaderStyle}>
             <span
               style={{

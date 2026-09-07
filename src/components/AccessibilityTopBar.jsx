@@ -127,11 +127,78 @@ export default function AccessibilityTopBar() {
   }, []);
 
   const handleSkipToMain = (e) => {
-    e.preventDefault();
-    const target = document.getElementById("main-section") || document.getElementById("main-content");
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (e) e.preventDefault();
+
+    // Priority-ordered lookup for primary content / core feature element
+    const target =
+      document.getElementById("main-content") ||
+      document.getElementById("main-feature") ||
+      document.querySelector("main form") ||
+      document.querySelector("main section") ||
+      document.querySelector("main [role='main']") ||
+      document.querySelector("main") ||
+      document.getElementById("main-section");
+
+    if (!target) return;
+
+    // Calculate exact target position in pixels from top of document
+    const rect = target.getBoundingClientRect();
+    const currentScrollY =
+      window.pageYOffset ||
+      document.documentElement.scrollTop ||
+      document.body.scrollTop ||
+      window.scrollY ||
+      0;
+
+    // Sticky headers across pages are ~60-64px.
+    // 80px offset ensures clean spacing below the sticky navbar.
+    const stickyHeaderOffset = 80;
+    const targetY = Math.max(0, Math.round(rect.top + currentScrollY - stickyHeaderOffset));
+
+    // Smoothly scroll to exact pixel coordinate
+    if (typeof window !== "undefined" && window.__lenis && typeof window.__lenis.scrollTo === "function") {
+      window.__lenis.scrollTo(targetY, {
+        offset: 0,
+        duration: 0.85,
+        immediate: false,
+      });
+    } else if (typeof window !== "undefined") {
+      window.scrollTo({
+        top: targetY,
+        behavior: "smooth",
+      });
+    }
+
+    // Ensure target is focusable and set focus
+    if (!target.hasAttribute("tabindex")) {
+      target.setAttribute("tabindex", "-1");
+    }
+    target.style.outline = "none";
+    try {
       target.focus({ preventScroll: true });
+    } catch {
+      // Fallback
+    }
+
+    // Focus the primary interactive element inside target if available
+    const interactive = target.querySelector(
+      "input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled]), a.hero-btn-primary, button:not([disabled])"
+    );
+    if (interactive && typeof interactive.focus === "function") {
+      try {
+        interactive.focus({ preventScroll: true });
+      } catch {
+        // Fallback
+      }
+    }
+
+    // Update URL hash cleanly
+    try {
+      if (typeof window !== "undefined" && window.history?.replaceState) {
+        window.history.replaceState(null, "", "#main-content");
+      }
+    } catch {
+      // Ignore
     }
   };
 
@@ -212,13 +279,13 @@ export default function AccessibilityTopBar() {
           <div className="right-controls">
             {/* Skip to Main Content Link */}
             <a
-              href="#main-section"
+              href="#main-content"
               onClick={handleSkipToMain}
               id="SkipToMain"
               title="Skip to main content"
               className="focus:outline-none focus:ring-1 focus:ring-white/40"
             >
-              {selectedLang === "hi" ? "मुख्य सामग्री पर जाएं" : "Skip to main content"}
+              {selectedLang === "hi" ? "मुख्य विषय पर जाएं" : "Skip to main content"}
             </a>
 
             <span className="partition" aria-hidden="true">

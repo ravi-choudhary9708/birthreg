@@ -489,3 +489,119 @@ export async function sendStatusUpdateEmail({
         attachments: attachments.length > 0 ? attachments : undefined,
     });
 }
+
+/**
+ * Send 6-Digit One-Time Password (OTP) for tracking access verification
+ */
+export async function sendTrackingOtpEmail({
+    email,
+    applicationNumber,
+    otp,
+    applicantName,
+    facility,
+}) {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const todayFormatted = formatDate(new Date());
+
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Your One-Time Password (OTP) - ${applicationNumber}</title>
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px 10px; -webkit-text-size-adjust: none;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+        <tr>
+          <td>
+            ${getEmailHeader()}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 32px 28px;">
+            <!-- Badge / Security Header -->
+            <div style="background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 10px; padding: 16px 18px; margin-bottom: 24px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 22px;">🔐</span>
+                  <h2 style="color: #1e40af; font-size: 16px; font-weight: 800; margin: 0;">
+                    Identity Verification Code
+                  </h2>
+                </div>
+                <span style="display: inline-block; padding: 3px 10px; background: #dbeafe; color: #1e40af; border-radius: 100px; font-size: 11px; font-weight: 700;">
+                  Confidential OTP
+                </span>
+              </div>
+              <p style="color: #374151; font-size: 13px; margin: 8px 0 0 0; line-height: 1.5;">
+                A verification request was made to view official application details for <strong>${applicationNumber}</strong>.
+              </p>
+            </div>
+
+            <!-- Greeting -->
+            <p style="color: #111827; font-size: 15px; margin: 0 0 12px 0;">
+              Dear <strong>${applicantName || "Applicant"}</strong>,
+            </p>
+            <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">
+              Please use the 6-digit verification code below to access your birth certificate application status and records.
+            </p>
+
+            <!-- 6-Digit OTP Box -->
+            <div style="background: #f8fafc; border: 2px solid #2563eb; border-radius: 12px; padding: 24px 20px; text-align: center; margin-bottom: 24px;">
+              <p style="color: #64748b; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; margin: 0 0 10px 0;">
+                Your 6-Digit Verification Code
+              </p>
+              <div style="display: inline-block; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 12px 28px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);">
+                <span style="color: #1e40af; font-size: 34px; font-weight: 800; letter-spacing: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; line-height: 1;">
+                  ${otp}
+                </span>
+              </div>
+              <p style="color: #dc2626; font-size: 12px; font-weight: 600; margin: 12px 0 0 0;">
+                ⏰ Valid for 10 minutes only
+              </p>
+            </div>
+
+            <!-- Meta details table -->
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 24px; font-size: 13px;">
+              <tr style="border-bottom: 1px solid #f3f4f6;">
+                <td style="padding: 9px 14px; color: #6b7280; width: 42%; font-weight: 500;">Application Number</td>
+                <td style="padding: 9px 14px; color: #1e40af; font-weight: 700; font-family: monospace;">${applicationNumber}</td>
+              </tr>
+              ${facility ? `
+              <tr style="border-bottom: 1px solid #f3f4f6;">
+                <td style="padding: 9px 14px; color: #6b7280; font-weight: 500;">Healthcare Facility</td>
+                <td style="padding: 9px 14px; color: #111827; font-weight: 600;">${facility}</td>
+              </tr>
+              ` : ""}
+              <tr>
+                <td style="padding: 9px 14px; color: #6b7280; font-weight: 500;">Generated At</td>
+                <td style="padding: 9px 14px; color: #111827; font-weight: 600;">${todayFormatted}</td>
+              </tr>
+            </table>
+
+            <!-- Security Warning -->
+            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 14px 16px; margin-bottom: 24px;">
+              <p style="color: #92400e; font-size: 12px; margin: 0; line-height: 1.5;">
+                🛡️ <strong>Security Tip:</strong> Government officials or medical staff will never ask you to share your OTP. If you did not initiate this request, please ignore this message.
+              </p>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            ${getEmailFooter(baseUrl)}
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+    `;
+
+    await transporter.sendMail({
+        from: `"Birth Certificate Portal - Madhubani" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: `Your 6-Digit OTP: ${otp} — Application ${applicationNumber} | Madhubani District`,
+        html: htmlContent,
+    });
+}
+

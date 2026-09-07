@@ -444,7 +444,17 @@ export default function OperatorDashboard() {
       </header>
 
       {/* Main Content Area */}
-      <main style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(16px, 2.5vw, 28px) 16px" }}>
+      <main
+        id="main-content"
+        tabIndex={-1}
+        style={{
+          maxWidth: 1280,
+          margin: "0 auto",
+          padding: "clamp(16px, 2.5vw, 28px) 16px",
+          scrollMarginTop: "90px",
+          outline: "none",
+        }}
+      >
 
         {/* TAB 1: 7-DAY SLA MONITORING & ANALYTICS */}
         {activeTab === "analytics" && (

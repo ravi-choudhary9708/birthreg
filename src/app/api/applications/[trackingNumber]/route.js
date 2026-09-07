@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/libs/prisma";
 import { apiResponse } from "@/utils/apiResponse";
 import { apiError } from "@/utils/apiError";
+import jwt from "jsonwebtoken";
 
 export async function GET(request, { params }) {
     try {
@@ -28,7 +29,25 @@ export async function GET(request, { params }) {
             throw new apiError(404, "No application found with this tracking number");
         }
 
-        // Return safe public data (no internal IDs or sensitive info)
+        const normalized = trackingNumber.toUpperCase();
+        const cookieToken = request.cookies.get(`track_verified_${normalized}`)?.value;
+        const authHeader = request.headers.get("authorization")?.replace("Bearer ", "");
+        const token = cookieToken || authHeader;
+
+        let isVerified = false;
+        if (token) {
+            try {
+                const jwtSecret = process.env.JWT_SECRET || "madhubani_track_secret_key";
+                const decoded = jwt.verify(token, jwtSecret);
+                if (decoded && decoded.applicationNumber === normalized) {
+                    isVerified = true;
+                }
+            } catch {
+                isVerified = false;
+            }
+        }
+
+        // Return safe public data + verification status
         const safeData = {
             applicationNumber: application.applicationNumber,
             status: application.status,
@@ -36,7 +55,8 @@ export async function GET(request, { params }) {
             childName: application.child?.name,
             createdAt: application.createdAt,
             updatedAt: application.updatedAt,
-            // Only include certificate URL if completed
+            isVerified,
+            // Only include certificate URL if completed and verified
             certificateUrl: application.status === "COMPLETED" ? application.certificateUrl : undefined,
         };
 

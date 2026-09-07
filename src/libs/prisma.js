@@ -32,7 +32,7 @@ function createPrismaClient() {
 }
 
 export const prisma =
-    globalForPrisma.prisma && globalForPrisma.prisma.subDivision && globalForPrisma.prisma.postOffice
+    globalForPrisma.prisma && globalForPrisma.prisma.subDivision && globalForPrisma.prisma.postOffice && globalForPrisma.prisma.otpVerification
         ? globalForPrisma.prisma
         : createPrismaClient();
 
