@@ -403,34 +403,74 @@ export default function HomePage() {
             minHeight: 64,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <img
-              src="/baby_birth.svg"
-              alt="Government of Bihar - Madhubani District Seal"
-              style={{ width: 40, height: 40, objectFit: "contain", flexShrink: 0 }}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* Government of Bihar Emblem */}
+            <Link
+              href="/"
+              style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0 }}
+              title="Government of Bihar"
+            >
+              <img
+                src="/bihar_government.webp"
+                alt="Government of Bihar Seal"
+                style={{
+                  height: 42,
+                  width: "auto",
+                  maxHeight: 42,
+                  objectFit: "contain",
+                  display: "block",
+                }}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/logo.png";
+                }}
+              />
+            </Link>
+
+            {/* Vertical Divider */}
+            <div
+              style={{
+                width: 1,
+                height: 36,
+                backgroundColor: "#d1d5db",
+                flexShrink: 0,
+              }}
+              aria-hidden="true"
             />
-            <div>
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: 15,
-                  color: "#111827",
-                  lineHeight: 1.2,
-                }}
-              >
-                Birth Certificate Portal
+
+            {/* Birth Portal Logo & Title */}
+            <Link
+              href="/"
+              style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}
+            >
+              <img
+                src="/baby_birth.svg"
+                alt="Birth Certificate Portal Logo"
+                style={{ width: 38, height: 38, objectFit: "contain", flexShrink: 0 }}
+              />
+              <div>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 15,
+                    color: "#111827",
+                    lineHeight: 1.2,
+                  }}
+                >
+                  Birth Certificate Portal
+                </div>
+                <div
+                  className="header-subtext"
+                  style={{
+                    fontSize: 11,
+                    color: "#6b7280",
+                    fontWeight: 500,
+                  }}
+                >
+                  District Administration Madhubani • Govt. of Bihar
+                </div>
               </div>
-              <div
-                className="header-subtext"
-                style={{
-                  fontSize: 11,
-                  color: "#6b7280",
-                  fontWeight: 500,
-                }}
-              >
-                District Administration Madhubani • Govt. of Bihar
-              </div>
-            </div>
+            </Link>
           </div>
 
           {/* Desktop Nav */}

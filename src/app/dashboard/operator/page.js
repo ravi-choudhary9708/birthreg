@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback, useRef, useMemo, Fragment } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import gsap from "gsap";
@@ -105,8 +106,26 @@ export default function OperatorDashboard() {
   const containerRef = useRef(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
   }, []);
+
+  // Lock background body scroll when any modal is open
+  useEffect(() => {
+    if (viewingApp || auditingFacility || showRejectModal || showUploadModal) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      if (typeof window !== "undefined" && window.__lenis) {
+        window.__lenis.stop();
+      }
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        if (typeof window !== "undefined" && window.__lenis) {
+          window.__lenis.start();
+        }
+      };
+    }
+  }, [viewingApp, auditingFacility, showRejectModal, showUploadModal]);
 
   // GSAP Entrance Animations
   useEffect(() => {
@@ -168,6 +187,7 @@ export default function OperatorDashboard() {
   }, [router]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchApps();
     fetchStats();
   }, [fetchApps, fetchStats]);
@@ -258,7 +278,7 @@ export default function OperatorDashboard() {
       if (facilityFilter === "COMPLIANT") return f.overdueVerifier === 0 && f.totalReceived > 0;
       return true;
     });
-  }, [stats?.facilities, facilitySearch, facilityFilter]);
+  }, [stats, facilitySearch, facilityFilter]);
 
   // Filtered applications for District Audit Log
   const auditFilteredApps = useMemo(() => {
@@ -301,7 +321,7 @@ export default function OperatorDashboard() {
         OnTrack: f.onTrackVerifier,
         Overdue: f.overdueVerifier,
       }));
-  }, [stats?.facilities]);
+  }, [stats]);
 
   return (
     <div ref={containerRef} style={{ minHeight: "100vh", background: "#f8fafc" }}>
@@ -309,10 +329,42 @@ export default function OperatorDashboard() {
       <header className="anim-op-header" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 16px", position: "sticky", top: 0, zIndex: 40 }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 64, flexWrap: "wrap", gap: 12, padding: "8px 0" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Link
+              href="/"
+              style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0 }}
+              title="Government of Bihar"
+            >
+              <img
+                src="/bihar_government.webp"
+                alt="Government of Bihar Seal"
+                style={{
+                  height: 40,
+                  width: "auto",
+                  maxHeight: 40,
+                  objectFit: "contain",
+                  display: "block",
+                }}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/logo.png";
+                }}
+              />
+            </Link>
+
+            <div
+              style={{
+                width: 1,
+                height: 34,
+                backgroundColor: "#cbd5e1",
+                flexShrink: 0,
+              }}
+              aria-hidden="true"
+            />
+
             <img
               src="/baby_birth.svg"
-              alt="Government of Bihar Seal"
-              style={{ width: 38, height: 38, objectFit: "contain", flexShrink: 0 }}
+              alt="Birth Portal Icon"
+              style={{ width: 36, height: 36, objectFit: "contain", flexShrink: 0 }}
             />
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1095,18 +1147,25 @@ export default function OperatorDashboard() {
       {/* FACILITY VERIFIER AUDIT & COMPLIANCE MODAL */}
       {/* ========================================================================= */}
       {auditingFacility && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 1100, padding: 16, backdropFilter: "blur(4px)",
-        }}>
-          <div style={{
-            background: "white", borderRadius: 18, width: "100%", maxWidth: 740,
-            maxHeight: "90vh", display: "flex", flexDirection: "column",
-            boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)", overflow: "hidden",
+        <div
+          data-lenis-prevent="true"
+          onWheel={(e) => e.stopPropagation()}
+          onClick={(e) => { if (e.target === e.currentTarget) setAuditingFacility(null); }}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1100, padding: 16, backdropFilter: "blur(4px)",
           }}>
+          <div
+            data-lenis-prevent="true"
+            onWheel={(e) => e.stopPropagation()}
+            style={{
+              background: "white", borderRadius: 18, width: "100%", maxWidth: 740,
+              maxHeight: "90vh", display: "flex", flexDirection: "column",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)", overflow: "hidden",
+            }}>
             {/* Header */}
-            <div style={{ padding: "18px 24px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc" }}>
+            <div style={{ padding: "18px 24px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", flexShrink: 0 }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Building2 size={20} color="#7c3aed" />
@@ -1126,7 +1185,10 @@ export default function OperatorDashboard() {
             </div>
 
             {/* Body */}
-            <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1 }}>
+            <div
+              data-lenis-prevent="true"
+              onWheel={(e) => e.stopPropagation()}
+              style={{ padding: "20px 24px", overflowY: "auto", flex: 1, minHeight: 0, maxHeight: "calc(90vh - 85px)", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}>
               {/* Scorecard */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 20 }}>
                 <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
@@ -1257,17 +1319,30 @@ export default function OperatorDashboard() {
 
       {/* View Full Application Modal */}
       {viewingApp && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 1000, padding: "clamp(10px, 3vw, 24px)",
-        }}>
-          <div style={{
-            background: "white", borderRadius: 16, width: "100%", maxWidth: 800,
-            maxHeight: "92vh", display: "flex", flexDirection: "column",
-            boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+        <div
+          data-lenis-prevent="true"
+          onWheel={(e) => e.stopPropagation()}
+          onClick={(e) => { if (e.target === e.currentTarget) setViewingApp(null); }}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1100, padding: "clamp(10px, 3vw, 24px)",
+            backdropFilter: "blur(4px)",
           }}>
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div
+            data-lenis-prevent="true"
+            onWheel={(e) => e.stopPropagation()}
+            style={{
+              background: "white", borderRadius: 16, width: "100%", maxWidth: 800,
+              maxHeight: "90vh", display: "flex", flexDirection: "column",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+              overflow: "hidden",
+            }}>
+            <div style={{
+              padding: "16px 20px", borderBottom: "1px solid #e5e7eb",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              flexShrink: 0, background: "#ffffff",
+            }}>
               <div>
                 <h3 style={{ fontSize: 18, fontWeight: 800, color: "#111827", margin: 0 }}>Application Details</h3>
                 <p style={{ color: "#6b7280", fontSize: 13, margin: "4px 0 0" }}>{viewingApp.applicationNumber} - {new Date(viewingApp.createdAt).toLocaleString("en-IN")}</p>
@@ -1275,7 +1350,18 @@ export default function OperatorDashboard() {
               <button onClick={() => setViewingApp(null)} style={{ background: "none", border: "none", fontSize: 24, cursor: "pointer", color: "#9ca3af" }}>×</button>
             </div>
             
-            <div style={{ padding: "clamp(16px, 3vw, 24px)", overflowY: "auto", flex: 1 }}>
+            <div
+              data-lenis-prevent="true"
+              onWheel={(e) => e.stopPropagation()}
+              style={{
+                padding: "clamp(16px, 3vw, 24px)",
+                overflowY: "auto",
+                flex: 1,
+                minHeight: 0,
+                maxHeight: "calc(90vh - 130px)",
+                overscrollBehavior: "contain",
+                WebkitOverflowScrolling: "touch",
+              }}>
               {/* Child Details */}
               <div style={{ marginBottom: 24 }}>
                 <h4 style={{ fontSize: 15, fontWeight: 700, color: "#1e40af", marginBottom: 12, borderBottom: "1px solid #bfdbfe", paddingBottom: 4 }}>Child Information (प्रारूप 1)</h4>
@@ -1297,8 +1383,8 @@ export default function OperatorDashboard() {
                       {viewingApp.child.birthPlaceAddress.plotNumber ? viewingApp.child.birthPlaceAddress.plotNumber + ", " : ""}
                       {viewingApp.child.birthPlaceAddress.mohalla ? viewingApp.child.birthPlaceAddress.mohalla + ", " : ""}
                       {viewingApp.child.birthPlaceAddress.village}, Ward {viewingApp.child.birthPlaceAddress.wardNumber}, 
-                      {viewingApp.child.birthPlaceAddress.subDistrict}, {viewingApp.child.birthPlaceAddress.district}, 
-                      {viewingApp.child.birthPlaceAddress.state} - {viewingApp.child.birthPlaceAddress.pinCode}
+                      {viewingApp.child.birthPlaceAddress.subDistrict}, {viewingApp.child.birthPlaceAddress.block ? viewingApp.child.birthPlaceAddress.block + ", " : ""}{viewingApp.child.birthPlaceAddress.district}, 
+                      {viewingApp.child.birthPlaceAddress.state} - {viewingApp.child.birthPlaceAddress.postOffice ? "PO: " + viewingApp.child.birthPlaceAddress.postOffice + ", " : ""}{viewingApp.child.birthPlaceAddress.pinCode}
                     </p>
                   </div>
                 )}
@@ -1336,8 +1422,8 @@ export default function OperatorDashboard() {
                       <p style={{ margin: 0, fontSize: 13 }}>
                         {viewingApp.parents.address.plotNumber ? viewingApp.parents.address.plotNumber + ", " : ""}
                         {viewingApp.parents.address.village}, Ward {viewingApp.parents.address.wardNumber}, 
-                        {viewingApp.parents.address.subDistrict}, {viewingApp.parents.address.district}, 
-                        {viewingApp.parents.address.state} - {viewingApp.parents.address.pinCode}
+                        {viewingApp.parents.address.subDistrict}, {viewingApp.parents.address.block ? viewingApp.parents.address.block + ", " : ""}{viewingApp.parents.address.district}, 
+                        {viewingApp.parents.address.state} - {viewingApp.parents.address.postOffice ? "PO: " + viewingApp.parents.address.postOffice + ", " : ""}{viewingApp.parents.address.pinCode}
                       </p>
                     </div>
                   )}
@@ -1347,8 +1433,8 @@ export default function OperatorDashboard() {
                       <p style={{ margin: 0, fontSize: 13 }}>
                         {viewingApp.parents.permanentAddress.plotNumber ? viewingApp.parents.permanentAddress.plotNumber + ", " : ""}
                         {viewingApp.parents.permanentAddress.village}, Ward {viewingApp.parents.permanentAddress.wardNumber}, 
-                        {viewingApp.parents.permanentAddress.subDistrict}, {viewingApp.parents.permanentAddress.district}, 
-                        {viewingApp.parents.permanentAddress.state} - {viewingApp.parents.permanentAddress.pinCode}
+                        {viewingApp.parents.permanentAddress.subDistrict}, {viewingApp.parents.permanentAddress.block ? viewingApp.parents.permanentAddress.block + ", " : ""}{viewingApp.parents.permanentAddress.district}, 
+                        {viewingApp.parents.permanentAddress.state} - {viewingApp.parents.permanentAddress.postOffice ? "PO: " + viewingApp.parents.permanentAddress.postOffice + ", " : ""}{viewingApp.parents.permanentAddress.pinCode}
                       </p>
                     </div>
                   )}
@@ -1372,8 +1458,8 @@ export default function OperatorDashboard() {
                     <p style={{ margin: 0, fontSize: 13 }}>
                       {viewingApp.informationProvider.informaionProviderAddress.plotNumber ? viewingApp.informationProvider.informaionProviderAddress.plotNumber + ", " : ""}
                       {viewingApp.informationProvider.informaionProviderAddress.village}, Ward {viewingApp.informationProvider.informaionProviderAddress.wardNumber}, 
-                      {viewingApp.informationProvider.informaionProviderAddress.subDistrict}, {viewingApp.informationProvider.informaionProviderAddress.district}, 
-                      {viewingApp.informationProvider.informaionProviderAddress.state} - {viewingApp.informationProvider.informaionProviderAddress.pinCode}
+                      {viewingApp.informationProvider.informaionProviderAddress.subDistrict}, {viewingApp.informationProvider.informaionProviderAddress.block ? viewingApp.informationProvider.informaionProviderAddress.block + ", " : ""}{viewingApp.informationProvider.informaionProviderAddress.district}, 
+                      {viewingApp.informationProvider.informaionProviderAddress.state} - {viewingApp.informationProvider.informaionProviderAddress.postOffice ? "PO: " + viewingApp.informationProvider.informaionProviderAddress.postOffice + ", " : ""}{viewingApp.informationProvider.informaionProviderAddress.pinCode}
                     </p>
                   </div>
                 )}
@@ -1398,7 +1484,7 @@ export default function OperatorDashboard() {
                     <p style={{ fontWeight: 700, color: "#374151", margin: "0 0 8px", fontSize: 13 }}>Mother&apos;s Address (At time of birth)</p>
                     <p style={{ margin: 0, fontSize: 13 }}>
                       {viewingApp.informationProvider.motherAddress.city}, {viewingApp.informationProvider.motherAddress.subDistrict}, 
-                      {viewingApp.informationProvider.motherAddress.district}, {viewingApp.informationProvider.motherAddress.state} - {viewingApp.informationProvider.motherAddress.pinCode}
+                      {viewingApp.informationProvider.motherAddress.block ? viewingApp.informationProvider.motherAddress.block + ", " : ""}{viewingApp.informationProvider.motherAddress.district}, {viewingApp.informationProvider.motherAddress.state} - {viewingApp.informationProvider.motherAddress.postOffice ? "PO: " + viewingApp.informationProvider.motherAddress.postOffice + ", " : ""}{viewingApp.informationProvider.motherAddress.pinCode}
                     </p>
                   </div>
                 )}
@@ -1406,7 +1492,11 @@ export default function OperatorDashboard() {
             </div>
 
             {/* Modal Actions */}
-            <div style={{ padding: "16px 24px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", borderBottomLeftRadius: 16, borderBottomRightRadius: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{
+              padding: "16px 24px", borderTop: "1px solid #e5e7eb", background: "#f9fafb",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              flexShrink: 0,
+            }}>
               <span style={{ fontSize: 13, color: "#6b7280", fontWeight: 600 }}>Status: <span style={{ color: STATUS_LABELS[viewingApp.status]?.color || "#000" }}>{STATUS_LABELS[viewingApp.status]?.label || viewingApp.status}</span></span>
               <button onClick={() => setViewingApp(null)} style={{
                 padding: "8px 24px", background: "#e5e7eb", border: "none",
@@ -1419,11 +1509,19 @@ export default function OperatorDashboard() {
 
       {/* Reject Modal */}
       {showRejectModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
-          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "clamp(12px, 3vw, 24px)",
-        }}>
-          <div style={{ background: "white", borderRadius: 20, padding: "clamp(20px, 4vw, 32px) clamp(16px, 4vw, 28px)", maxWidth: 460, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+        <div
+          data-lenis-prevent="true"
+          onWheel={(e) => e.stopPropagation()}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowRejectModal(null); setRemarks(""); } }}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1100, padding: "clamp(12px, 3vw, 24px)", backdropFilter: "blur(4px)",
+          }}>
+          <div
+            data-lenis-prevent="true"
+            onWheel={(e) => e.stopPropagation()}
+            style={{ background: "white", borderRadius: 20, padding: "clamp(20px, 4vw, 32px) clamp(16px, 4vw, 28px)", maxWidth: 460, width: "100%", maxHeight: "90vh", overflowY: "auto", overscrollBehavior: "contain" }}>
             <h3 style={{ fontSize: 18, fontWeight: 700, color: "#111827", marginBottom: 8 }}>Reject Application</h3>
             <p style={{ color: "#6b7280", fontSize: 14, marginBottom: 20 }}>This reason will be emailed to the applicant.</p>
             <textarea
@@ -1447,11 +1545,19 @@ export default function OperatorDashboard() {
 
       {/* Upload Modal */}
       {showUploadModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
-          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "clamp(12px, 3vw, 24px)",
-        }}>
-          <div style={{ background: "white", borderRadius: 20, padding: "clamp(20px, 4vw, 32px) clamp(16px, 4vw, 28px)", maxWidth: 460, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+        <div
+          data-lenis-prevent="true"
+          onWheel={(e) => e.stopPropagation()}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowUploadModal(null); setUploadFile(null); } }}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1100, padding: "clamp(12px, 3vw, 24px)", backdropFilter: "blur(4px)",
+          }}>
+          <div
+            data-lenis-prevent="true"
+            onWheel={(e) => e.stopPropagation()}
+            style={{ background: "white", borderRadius: 20, padding: "clamp(20px, 4vw, 32px) clamp(16px, 4vw, 28px)", maxWidth: 460, width: "100%", maxHeight: "90vh", overflowY: "auto", overscrollBehavior: "contain" }}>
             <h3 style={{ fontSize: 18, fontWeight: 700, color: "#111827", marginBottom: 8 }}>Upload Certificate</h3>
             <p style={{ color: "#6b7280", fontSize: 14, marginBottom: 20 }}>
               Upload the certificate generated from the CRS portal. The parent will be notified automatically.

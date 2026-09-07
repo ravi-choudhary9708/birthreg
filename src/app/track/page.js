@@ -137,29 +137,61 @@ export default function TrackPage() {
             gap: 10,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Link href="/" style={{ display: "flex", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Link
+              href="/"
+              style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0 }}
+              title="Government of Bihar"
+            >
               <img
-                src="/baby_birth.svg"
-                alt="Govt of Bihar Logo"
-                style={{ width: 36, height: 36, objectFit: "contain", flexShrink: 0 }}
+                src="/bihar_government.webp"
+                alt="Government of Bihar Seal"
+                style={{
+                  height: 38,
+                  width: "auto",
+                  maxHeight: 38,
+                  objectFit: "contain",
+                  display: "block",
+                }}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/logo.png";
+                }}
               />
             </Link>
-            <div>
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: 14,
-                  color: "#111827",
-                  lineHeight: 1.2,
-                }}
-              >
-                Birth Certificate Portal
+
+            <div
+              style={{
+                width: 1,
+                height: 32,
+                backgroundColor: "#d1d5db",
+                flexShrink: 0,
+              }}
+              aria-hidden="true"
+            />
+
+            <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
+              <img
+                src="/baby_birth.svg"
+                alt="Birth Certificate Portal Logo"
+                style={{ width: 34, height: 34, objectFit: "contain", flexShrink: 0 }}
+              />
+              <div>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 14,
+                    color: "#111827",
+                    lineHeight: 1.2,
+                  }}
+                >
+                  Birth Certificate Portal
+                </div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>
+                  District Administration Madhubani • Govt. of Bihar
+                </div>
               </div>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>
-                District Administration Madhubani • Govt. of Bihar
-              </div>
-            </div>
+            </Link>
           </div>
           <Link
             href="/"

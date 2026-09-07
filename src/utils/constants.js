@@ -98,3 +98,5 @@ export const STATUS_CONFIG = {
         step: 4,
     },
 };
+
+export * from "./subdivisions";

@@ -21,9 +21,11 @@ export function serializeApplication(app) {
             village: app.child.birthVillage,
             wardNumber: app.child.birthWardNumber || "",
             subDistrict: app.child.birthSubDistrict,
+            block: app.child.birthBlock || "",
             district: app.child.birthDistrict,
             state: app.child.birthState,
             pinCode: app.child.birthPinCode,
+            postOffice: app.child.birthPostOffice || "",
         }
     } : undefined;
 
@@ -46,9 +48,11 @@ export function serializeApplication(app) {
             village: app.parents.presentVillage,
             wardNumber: app.parents.presentWardNumber || "",
             subDistrict: app.parents.presentSubDistrict,
+            block: app.parents.presentBlock || "",
             district: app.parents.presentDistrict,
             state: app.parents.presentState,
             pinCode: app.parents.presentPinCode,
+            postOffice: app.parents.presentPostOffice || "",
         },
         permanentAddress: {
             plotNumber: app.parents.permPlotNumber || "",
@@ -56,9 +60,11 @@ export function serializeApplication(app) {
             village: app.parents.permVillage,
             wardNumber: app.parents.permWardNumber || "",
             subDistrict: app.parents.permSubDistrict,
+            block: app.parents.permBlock || "",
             district: app.parents.permDistrict,
             state: app.parents.permState,
             pinCode: app.parents.permPinCode,
+            postOffice: app.parents.permPostOffice || "",
         }
     } : undefined;
 
@@ -73,16 +79,20 @@ export function serializeApplication(app) {
             village: app.informant.informantVillage,
             wardNumber: app.informant.informantWardNumber || "",
             subDistrict: app.informant.informantSubDistrict,
+            block: app.informant.informantBlock || "",
             district: app.informant.informantDistrict,
             state: app.informant.informantState,
             pinCode: app.informant.informantPinCode,
+            postOffice: app.informant.informantPostOffice || "",
         },
         motherAddress: {
             city: app.informant.motherCity,
             subDistrict: app.informant.motherSubDistrict,
+            block: app.informant.motherBlock || "",
             district: app.informant.motherDistrict,
             state: app.informant.motherState,
             pinCode: app.informant.motherPinCode,
+            postOffice: app.informant.motherPostOffice || "",
         },
         motherReligion: app.informant.motherReligion,
         fatherReligion: app.informant.fatherReligion,
@@ -139,9 +149,11 @@ export function formatPrismaApplicationCreate(data) {
                 birthVillage: child.birthPlaceAddress?.village || "",
                 birthWardNumber: child.birthPlaceAddress?.wardNumber || null,
                 birthSubDistrict: child.birthPlaceAddress?.subDistrict || "",
+                birthBlock: child.birthPlaceAddress?.block || null,
                 birthDistrict: child.birthPlaceAddress?.district || "",
                 birthState: child.birthPlaceAddress?.state || "",
                 birthPinCode: child.birthPlaceAddress?.pinCode || "",
+                birthPostOffice: child.birthPlaceAddress?.postOffice || null,
             }
         },
         parents: {
@@ -160,18 +172,22 @@ export function formatPrismaApplicationCreate(data) {
                 presentVillage: parents.address?.village || "",
                 presentWardNumber: parents.address?.wardNumber || null,
                 presentSubDistrict: parents.address?.subDistrict || "",
+                presentBlock: parents.address?.block || null,
                 presentDistrict: parents.address?.district || "",
                 presentState: parents.address?.state || "",
                 presentPinCode: parents.address?.pinCode || "",
+                presentPostOffice: parents.address?.postOffice || null,
 
                 permPlotNumber: parents.permanentAddress?.plotNumber || null,
                 permMohalla: parents.permanentAddress?.mohalla || null,
                 permVillage: parents.permanentAddress?.village || "",
                 permWardNumber: parents.permanentAddress?.wardNumber || null,
                 permSubDistrict: parents.permanentAddress?.subDistrict || "",
+                permBlock: parents.permanentAddress?.block || null,
                 permDistrict: parents.permanentAddress?.district || "",
                 permState: parents.permanentAddress?.state || "",
                 permPinCode: parents.permanentAddress?.pinCode || "",
+                permPostOffice: parents.permanentAddress?.postOffice || null,
             }
         },
         informant: {
@@ -186,15 +202,19 @@ export function formatPrismaApplicationCreate(data) {
                 informantVillage: informationProvider.informaionProviderAddress?.village || "",
                 informantWardNumber: informationProvider.informaionProviderAddress?.wardNumber || null,
                 informantSubDistrict: informationProvider.informaionProviderAddress?.subDistrict || "",
+                informantBlock: informationProvider.informaionProviderAddress?.block || null,
                 informantDistrict: informationProvider.informaionProviderAddress?.district || "",
                 informantState: informationProvider.informaionProviderAddress?.state || "",
                 informantPinCode: informationProvider.informaionProviderAddress?.pinCode || "",
+                informantPostOffice: informationProvider.informaionProviderAddress?.postOffice || null,
 
                 motherCity: informationProvider.motherAddress?.city || "",
                 motherSubDistrict: informationProvider.motherAddress?.subDistrict || "",
+                motherBlock: informationProvider.motherAddress?.block || null,
                 motherDistrict: informationProvider.motherAddress?.district || "",
                 motherState: informationProvider.motherAddress?.state || "",
                 motherPinCode: informationProvider.motherAddress?.pinCode || "",
+                motherPostOffice: informationProvider.motherAddress?.postOffice || null,
 
                 motherReligion: informationProvider.motherReligion || "",
                 fatherReligion: informationProvider.fatherReligion || "",

@@ -85,7 +85,73 @@ async function seed() {
             },
         });
 
-        console.log(`✅ Seeded ${VERIFIER_ACCOUNTS.length} verifier accounts and central operator into PostgreSQL successfully!`);
+        // Seed Sub-Divisions and Blocks
+        const { SUB_DIVISIONS_AND_BLOCKS } = require("./src/utils/subdivisions");
+        const { MADHUBANI_POST_OFFICES } = require("./src/utils/postOffices");
+
+        for (const sub of SUB_DIVISIONS_AND_BLOCKS) {
+            const subDiv = await prisma.subDivision.upsert({
+                where: { code: sub.code },
+                update: {
+                    name: sub.name,
+                    nameHi: sub.nameHi,
+                    displayName: sub.displayName,
+                    district: "Madhubani",
+                },
+                create: {
+                    code: sub.code,
+                    name: sub.name,
+                    nameHi: sub.nameHi,
+                    displayName: sub.displayName,
+                    district: "Madhubani",
+                },
+            });
+
+            for (const b of sub.blocks) {
+                await prisma.block.upsert({
+                    where: {
+                        subDivisionId_name: {
+                            subDivisionId: subDiv.id,
+                            name: b.name,
+                        },
+                    },
+                    update: {
+                        code: b.code,
+                        nameHi: b.nameHi,
+                        displayName: b.displayName,
+                    },
+                    create: {
+                        code: b.code,
+                        name: b.name,
+                        nameHi: b.nameHi,
+                        displayName: b.displayName,
+                        subDivisionId: subDiv.id,
+                    },
+                });
+            }
+        }
+
+        // Seed Post Offices
+        for (const po of MADHUBANI_POST_OFFICES) {
+            await prisma.postOffice.upsert({
+                where: {
+                    pincode_name: {
+                        pincode: po.pincode,
+                        name: po.name,
+                    },
+                },
+                update: {
+                    district: po.district || "MADHUBANI",
+                },
+                create: {
+                    name: po.name,
+                    pincode: po.pincode,
+                    district: po.district || "MADHUBANI",
+                },
+            });
+        }
+
+        console.log(`✅ Seeded ${VERIFIER_ACCOUNTS.length} verifier accounts, central operator, 5 Sub-Divisions, 21 Blocks, and ${MADHUBANI_POST_OFFICES.length} Post Offices into PostgreSQL successfully!`);
         await pool.end();
         process.exit(0);
     } catch (e) {

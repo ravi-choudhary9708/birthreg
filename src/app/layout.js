@@ -2,6 +2,7 @@ import { Inter } from "next/font/google";
 import "lenis/dist/lenis.css";
 import "./globals.css";
 import SmoothScroll from "@/components/SmoothScroll";
+import AccessibilityTopBar from "@/components/AccessibilityTopBar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,9 +23,14 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" data-scroll-behavior="smooth" className={inter.className}>
-      <body style={{ minHeight: "100vh", background: "#ffffff" }}>
-        <SmoothScroll>{children}</SmoothScroll>
+    <html lang="en" data-scroll-behavior="smooth" className={inter.className} suppressHydrationWarning>
+      <body style={{ minHeight: "100vh", background: "#ffffff" }} suppressHydrationWarning>
+        <AccessibilityTopBar />
+        <SmoothScroll>
+          <main id="main-section" tabIndex={-1} style={{ outline: "none" }}>
+            {children}
+          </main>
+        </SmoothScroll>
       </body>
     </html>
   );

@@ -4,6 +4,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { FACILITIES } from "@/utils/constants";
+import { SUB_DIVISIONS_AND_BLOCKS, getBlocksForSubDivision } from "@/utils/subdivisions";
+import {
+  MADHUBANI_POST_OFFICES,
+  getPostOfficesForPincode,
+  isValidMadhubaniPincode,
+} from "@/utils/postOffices";
 import DynamicDatePicker from "@/components/DynamicDatePicker";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -111,7 +117,33 @@ function ApplyFormContent({ facParam }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
+  const [subDivisionsList, setSubDivisionsList] = useState(SUB_DIVISIONS_AND_BLOCKS);
+  const [postOfficesList, setPostOfficesList] = useState(MADHUBANI_POST_OFFICES);
   const containerRef = useRef(null);
+
+  useEffect(() => {
+    fetch("/api/subdivisions")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data && data.data.length > 0) {
+          setSubDivisionsList(data.data);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load subdivisions from API:", err);
+      });
+
+    fetch("/api/post-offices")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data && data.data.length > 0) {
+          setPostOfficesList(data.data);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load post offices from API:", err);
+      });
+  }, []);
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger);
@@ -181,9 +213,11 @@ function ApplyFormContent({ facParam }) {
         village: "",
         wardNumber: "",
         subDistrict: "",
+        block: "",
         district: "Madhubani",
         state: "Bihar",
         pinCode: "",
+        postOffice: "",
       },
       mother: {
         name: "",
@@ -203,9 +237,11 @@ function ApplyFormContent({ facParam }) {
         village: "",
         wardNumber: "",
         subDistrict: "",
+        block: "",
         district: "Madhubani",
         state: "Bihar",
         pinCode: "",
+        postOffice: "",
       },
       permanentAddress: {
         plotNumber: "",
@@ -213,9 +249,11 @@ function ApplyFormContent({ facParam }) {
         village: "",
         wardNumber: "",
         subDistrict: "",
+        block: "",
         district: "Madhubani",
         state: "Bihar",
         pinCode: "",
+        postOffice: "",
       },
       sameAddress: true,
       informationProvider: {
@@ -273,6 +311,33 @@ function ApplyFormContent({ facParam }) {
     });
   };
 
+  const handleSubDistrictChange = (section, value) => {
+    setForm((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        subDistrict: value,
+        block: "",
+      },
+    }));
+  };
+
+  const handlePincodeChange = (section, rawValue) => {
+    const digitsOnly = rawValue.replace(/\D/g, "").slice(0, 6);
+    setForm((prev) => {
+      const prevPin = prev[section]?.pinCode || "";
+      const isChanging = prevPin !== digitsOnly;
+      return {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          pinCode: digitsOnly,
+          postOffice: isChanging ? "" : prev[section]?.postOffice || "",
+        },
+      };
+    });
+  };
+
   const handleRelationChange = (newRelation) => {
     setForm((prev) => {
       let updatedProvider = {
@@ -319,6 +384,103 @@ function ApplyFormContent({ facParam }) {
     update(section, field, formatted);
   };
 
+  const formatMobileNumber = (value, prevValue = "") => {
+    if (!value) return "";
+
+    const isDeleting = Boolean(prevValue && value.length < prevValue.length);
+
+    let str = value.trim();
+
+    // If string begins with "+91" or "+ 91", strip the "+91" prefix to isolate the subscriber number
+    if (str.startsWith("+91") || str.startsWith("+ 91")) {
+      str = str.replace(/^\+\s*91\s*/, "");
+    } else if (str.startsWith("+")) {
+      str = str.slice(1).trim();
+    } else if (str.startsWith("91") && str.replace(/\D/g, "").length > 10) {
+      str = str.slice(2).trim();
+    } else if (str.startsWith("0") && str.replace(/\D/g, "").length > 10) {
+      str = str.slice(1).trim();
+    }
+
+    // Extract subscriber digits only
+    let digits = str.replace(/\D/g, "");
+
+    // If deleting and no subscriber digits remain, reset to empty string
+    if (isDeleting && digits.length === 0) {
+      return "";
+    }
+
+    if (digits.length === 0) {
+      return "";
+    }
+
+    // Limit subscriber number to exactly 10 digits
+    digits = digits.slice(0, 10);
+
+    return `+91 ${digits}`;
+  };
+
+  const handleMobileChange = (section, field, value, prevValue = "") => {
+    const formatted = formatMobileNumber(value, prevValue);
+    update(section, field, formatted);
+  };
+
+  const renderMobileHint = (val) => {
+    if (!val || !val.trim()) {
+      return (
+        <span style={{ color: "#6b7280" }}>
+          10-अंकों का मोबाइल नंबर
+        </span>
+      );
+    }
+    const digits = val.replace(/^\+91\s*/, "").replace(/\D/g, "");
+    if (digits.length === 10) {
+      return (
+        <span style={{ color: "#16a34a", fontWeight: 600 }}>
+          ✓ वैध 10-अंकों का मोबाइल नंबर / Valid 10-digit mobile number
+        </span>
+      );
+    }
+    return (
+      <span style={{ color: "#d97706", fontWeight: 600 }}>
+        ⚠️ {digits.length}/10 अंक दर्ज किए गए ({10 - digits.length} अंक शेष / {10 - digits.length} digits remaining)
+      </span>
+    );
+  };
+
+  const isValidEmail = (email) => {
+    if (!email || typeof email !== "string") return false;
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return emailRegex.test(email.trim());
+  };
+
+  const renderEmailHint = (val, isRequired = false) => {
+    if (!val || !val.trim()) {
+      return isRequired ? (
+        <span style={{ color: "#6b7280" }}>
+          आधिकारिक ट्रैकिंग एवं प्रमाणपत्र प्राप्ति हेतु अनिवार्य (Mandatory for tracking & certificate)
+        </span>
+      ) : (
+        <span style={{ color: "#6b7280" }}>
+          वैकल्पिक (Optional - उदा० name@example.com)
+        </span>
+      );
+    }
+    const valid = isValidEmail(val);
+    if (valid) {
+      return (
+        <span style={{ color: "#16a34a", fontWeight: 600 }}>
+          ✓ मान्य ईमेल आई० डी० (Valid Email Address)
+        </span>
+      );
+    }
+    return (
+      <span style={{ color: "#dc2626", fontWeight: 600 }}>
+        ⚠️ कृपया सही ईमेल आई० डी० दर्ज करें (उदा० name@example.com)
+      </span>
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -329,6 +491,58 @@ function ApplyFormContent({ facParam }) {
     }
     if (!form.father.adharNumber || !aadhaarPattern.test(form.father.adharNumber.trim())) {
       setError("पिता की 12-अंकों की वैध आधार संख्या (XXXX-XXXX-XXXX) अनिवार्य है। Please enter a valid 12-digit Aadhaar number for Father.");
+      return;
+    }
+
+    const validateMobile = (mobile, label) => {
+      if (!mobile || !mobile.trim()) {
+        return `${label} का 10-अंकों का मोबाइल नंबर अनिवार्य है (Mobile number is required).`;
+      }
+      const digits = mobile.replace(/^\+91\s*/, "").replace(/\D/g, "");
+      if (digits.length !== 10) {
+        return `${label} का मोबाइल नंबर पूरे 10 अंकों का होना चाहिए (+91 XXXXXXXXXX). Please enter a valid 10-digit mobile number for ${label}.`;
+      }
+      if (!/^[6-9]\d{9}$/.test(digits)) {
+        return `${label} का मोबाइल नंबर 6, 7, 8 या 9 से शुरू होने वाला 10-अंकों का वैध नंबर होना चाहिए। Please enter a valid 10-digit Indian mobile number starting with 6-9 for ${label}.`;
+      }
+      return null;
+    };
+
+    const motherMobileErr = validateMobile(form.mother.mobileNumber, "माता (Mother)");
+    if (motherMobileErr) {
+      setError(motherMobileErr);
+      return;
+    }
+
+    const fatherMobileErr = validateMobile(form.father.mobileNumber, "पिता (Father)");
+    if (fatherMobileErr) {
+      setError(fatherMobileErr);
+      return;
+    }
+
+    const informantMobileErr = validateMobile(form.informationProvider.mobileNumber, "सूचनादाता (Informant)");
+    if (informantMobileErr) {
+      setError(informantMobileErr);
+      return;
+    }
+
+    // Email Validations
+    if (!form.informationProvider.email || !form.informationProvider.email.trim()) {
+      setError("सूचनादाता का ईमेल आई० डी० (Email Address) अनिवार्य है। Email address for Information Provider is required for official status tracking & certificate delivery.");
+      return;
+    }
+    if (!isValidEmail(form.informationProvider.email)) {
+      setError("सूचनादाता का ईमेल आई० डी० अमान्य है (उदा० applicant@example.com)। Please enter a valid email address for Information Provider.");
+      return;
+    }
+
+    if (form.mother.email && form.mother.email.trim() && !isValidEmail(form.mother.email)) {
+      setError("माता का ईमेल आई० डी० अमान्य है (उदा० mother@example.com)। Please enter a valid email address for Mother.");
+      return;
+    }
+
+    if (form.father.email && form.father.email.trim() && !isValidEmail(form.father.email)) {
+      setError("पिता का ईमेल आई० डी० अमान्य है (उदा० father@example.com)। Please enter a valid email address for Father.");
       return;
     }
 
@@ -347,6 +561,36 @@ function ApplyFormContent({ facParam }) {
     if (!form.informationProvider.declarationAccepted) {
       setError("Please check and accept the statutory legal declaration before submitting.");
       return;
+    }
+
+    const pinPattern = /^\d{6}$/;
+    if (!form.address.pinCode || !pinPattern.test(form.address.pinCode.trim())) {
+      setError("पता में 6-अंकों का वैध पिनकोड अनिवार्य है (Please enter a valid 6-digit PIN code in address).");
+      return;
+    }
+    if (!form.address.postOffice) {
+      setError("पता में डाकघर (Post Office) का चयन अनिवार्य है (Please select Post Office in address).");
+      return;
+    }
+    if (!form.sameAddress) {
+      if (!form.permanentAddress.pinCode || !pinPattern.test(form.permanentAddress.pinCode.trim())) {
+        setError("स्थायी पते में 6-अंकों का वैध पिनकोड अनिवार्य है (Please enter a valid 6-digit PIN code in permanent address).");
+        return;
+      }
+      if (!form.permanentAddress.postOffice) {
+        setError("स्थायी पते में डाकघर (Post Office) का चयन अनिवार्य है (Please select Post Office in permanent address).");
+        return;
+      }
+    }
+    if (form.child.placeOfBirth !== "Hospital") {
+      if (!form.birthPlaceAddress.pinCode || !pinPattern.test(form.birthPlaceAddress.pinCode.trim())) {
+        setError("जन्म स्थान के पते में 6-अंकों का वैध पिनकोड अनिवार्य है (Please enter a valid 6-digit PIN code in birth place address).");
+        return;
+      }
+      if (!form.birthPlaceAddress.postOffice) {
+        setError("जन्म स्थान के पते में डाकघर (Post Office) का चयन अनिवार्य है (Please select Post Office in birth place address).");
+        return;
+      }
     }
 
     setLoading(true);
@@ -374,9 +618,11 @@ function ApplyFormContent({ facParam }) {
                   village: form.facility,
                   wardNumber: "",
                   subDistrict: form.address.subDistrict || "Madhubani",
+                  block: form.address.block || "",
                   district: "Madhubani",
                   state: "Bihar",
                   pinCode: form.address.pinCode || "847211",
+                  postOffice: form.address.postOffice || "",
                 }
               : form.birthPlaceAddress,
         },
@@ -398,9 +644,11 @@ function ApplyFormContent({ facParam }) {
           motherAddress: {
             city: form.address.village,
             subDistrict: form.address.subDistrict,
+            block: form.address.block || "",
             district: form.address.district,
             state: form.address.state,
             pinCode: form.address.pinCode,
+            postOffice: form.address.postOffice || "",
           },
           motherReligion: form.informationProvider.motherReligion,
           fatherReligion: form.informationProvider.fatherReligion,
@@ -566,12 +814,44 @@ function ApplyFormContent({ facParam }) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Link href="/" style={{ display: "flex", alignItems: "center" }}>
+            <Link
+              href="/"
+              style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0 }}
+              title="Government of Bihar"
+            >
+              <img
+                src="/bihar_government.webp"
+                alt="Government of Bihar Seal"
+                style={{
+                  height: 40,
+                  width: "auto",
+                  maxHeight: 40,
+                  objectFit: "contain",
+                  display: "block",
+                }}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/logo.png";
+                }}
+              />
+            </Link>
+
+            <div
+              style={{
+                width: 1,
+                height: 36,
+                backgroundColor: "#d1d5db",
+                flexShrink: 0,
+              }}
+              aria-hidden="true"
+            />
+
+            <Link href="/" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
               <Image
                 src="/baby_birth.svg"
-                alt="Government of Bihar Logo"
-                width={40}
-                height={40}
+                alt="Birth Certificate Portal Logo"
+                width={38}
+                height={38}
                 priority
                 loading="eager"
                 style={{ objectFit: "contain", flexShrink: 0 }}
@@ -625,6 +905,7 @@ function ApplyFormContent({ facParam }) {
       </div>
 
       <form
+        autoComplete="off"
         onSubmit={handleSubmit}
         style={{
           maxWidth: 860,
@@ -660,6 +941,7 @@ function ApplyFormContent({ facParam }) {
             required
           >
             <select
+              suppressHydrationWarning
               style={inputStyle}
               value={form.facility}
               onChange={(e) => {
@@ -675,7 +957,7 @@ function ApplyFormContent({ facParam }) {
               }}
               required
             >
-              <option value="">— Select Authorized Facility (39 Facilities in Madhubani) —</option>
+              <option value="">— Select Authorized Facility —</option>
               {FACILITIES.map((f) => (
                 <option key={f} value={f}>
                   {f}
@@ -737,6 +1019,7 @@ function ApplyFormContent({ facParam }) {
 
             <Field label="लिंग (Gender)" required>
               <select
+                suppressHydrationWarning
                 style={inputStyle}
                 value={form.child.gender}
                 onChange={(e) => update("child", "gender", e.target.value)}
@@ -768,6 +1051,7 @@ function ApplyFormContent({ facParam }) {
               required
             >
               <select
+                suppressHydrationWarning
                 style={inputStyle}
                 value={form.child.placeOfBirth}
                 onChange={(e) => update("child", "placeOfBirth", e.target.value)}
@@ -824,13 +1108,46 @@ function ApplyFormContent({ facParam }) {
                     required
                   />
                 </Field>
-                <Field label="उप-जिला / प्रखण्ड (Sub-District / Block)" required>
-                  <input
+                <Field label="अनुमंडल / उप-जिला (Sub-Division / Sub-District)" required>
+                  <select
+                    suppressHydrationWarning
                     style={inputStyle}
                     value={form.birthPlaceAddress.subDistrict}
-                    onChange={(e) => update("birthPlaceAddress", "subDistrict", e.target.value)}
+                    onChange={(e) => handleSubDistrictChange("birthPlaceAddress", e.target.value)}
                     required
-                  />
+                  >
+                    <option value="">-- अनुमंडल चुनें (Select Sub-Division) --</option>
+                    {subDivisionsList.map((sub) => (
+                      <option key={sub.id || sub.code} value={sub.displayName || sub.name}>
+                        {sub.displayName || `${sub.name}/${sub.nameHi}`}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="प्रखंड (Block)" required>
+                  <select
+                    suppressHydrationWarning
+                    style={{
+                      ...inputStyle,
+                      cursor: form.birthPlaceAddress.subDistrict ? "pointer" : "not-allowed",
+                      background: form.birthPlaceAddress.subDistrict ? "white" : "#f9fafb",
+                    }}
+                    value={form.birthPlaceAddress.block}
+                    onChange={(e) => update("birthPlaceAddress", "block", e.target.value)}
+                    required
+                    disabled={!form.birthPlaceAddress.subDistrict}
+                  >
+                    <option value="">
+                      {form.birthPlaceAddress.subDistrict
+                        ? "-- प्रखंड चुनें (Select Block) --"
+                        : "-- पहले अनुमंडल चुनें (Select Sub-Division first) --"}
+                    </option>
+                    {getBlocksForSubDivision(form.birthPlaceAddress.subDistrict, subDivisionsList).map((b) => (
+                      <option key={b.id || b.code} value={b.displayName || b.name}>
+                        {b.displayName || `${b.name}/${b.nameHi}`}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
                 <Field label="जिला (District)" required>
                   <input
@@ -848,14 +1165,68 @@ function ApplyFormContent({ facParam }) {
                     required
                   />
                 </Field>
-                <Field label="पिनकोड (PIN Code)" required>
+                <Field
+                  label="पिनकोड (PIN Code)"
+                  required
+                  hint={
+                    form.birthPlaceAddress.pinCode.length === 6
+                      ? isValidMadhubaniPincode(form.birthPlaceAddress.pinCode)
+                        ? "✓ मान्य मधुबनी पिनकोड (Valid Madhubani PIN code)"
+                        : "⚠️ यह पिनकोड मधुबनी जिले की सूची में नहीं है (Not in official Madhubani list)"
+                      : "6 अंकों का पिनकोड दर्ज करें (Enter 6-digit PIN)"
+                  }
+                >
                   <input
-                    style={inputStyle}
+                    style={{
+                      ...inputStyle,
+                      borderColor:
+                        form.birthPlaceAddress.pinCode.length === 6
+                          ? isValidMadhubaniPincode(form.birthPlaceAddress.pinCode)
+                            ? "#16a34a"
+                            : "#f59e0b"
+                          : undefined,
+                    }}
                     maxLength={6}
+                    placeholder="उदा० 847211"
                     value={form.birthPlaceAddress.pinCode}
-                    onChange={(e) => update("birthPlaceAddress", "pinCode", e.target.value)}
+                    onChange={(e) => handlePincodeChange("birthPlaceAddress", e.target.value)}
                     required
                   />
+                </Field>
+                <Field
+                  label="डाकघर (Post Office)"
+                  required
+                  hint={
+                    form.birthPlaceAddress.pinCode.length === 6
+                      ? getPostOfficesForPincode(form.birthPlaceAddress.pinCode, postOfficesList).length > 0
+                        ? `${getPostOfficesForPincode(form.birthPlaceAddress.pinCode, postOfficesList).length} डाकघर उपलब्ध (available)`
+                        : "इस पिनकोड के लिए कोई डाकघर नहीं मिला"
+                      : "पहले 6 अंकों का पिनकोड दर्ज करें"
+                  }
+                >
+                  <select
+                    suppressHydrationWarning
+                    style={{
+                      ...inputStyle,
+                      cursor: form.birthPlaceAddress.pinCode.length === 6 ? "pointer" : "not-allowed",
+                      background: form.birthPlaceAddress.pinCode.length === 6 ? "white" : "#f9fafb",
+                    }}
+                    value={form.birthPlaceAddress.postOffice}
+                    onChange={(e) => update("birthPlaceAddress", "postOffice", e.target.value)}
+                    required
+                    disabled={form.birthPlaceAddress.pinCode.length !== 6}
+                  >
+                    <option value="">
+                      {form.birthPlaceAddress.pinCode.length === 6
+                        ? "-- डाकघर चुनें (Select Post Office) --"
+                        : "-- पहले पिनकोड दर्ज करें (Enter PIN Code first) --"}
+                    </option>
+                    {getPostOfficesForPincode(form.birthPlaceAddress.pinCode, postOfficesList).map((po) => (
+                      <option key={po.id || po.name} value={po.name}>
+                        {po.name}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
               </Grid>
             </div>
@@ -899,13 +1270,14 @@ function ApplyFormContent({ facParam }) {
                 required
               />
             </Field>
-            <Field label="मोबाईल नं० (Mobile Number)" required>
+            <Field label="मोबाईल नं० (Mobile Number)" hint={renderMobileHint(form.mother.mobileNumber)} required>
               <input
+                type="tel"
                 style={inputStyle}
-                placeholder="10-digit mobile number"
-                maxLength={10}
+                placeholder="+91 98765 43210"
+                maxLength={15}
                 value={form.mother.mobileNumber}
-                onChange={(e) => update("mother", "mobileNumber", e.target.value)}
+                onChange={(e) => handleMobileChange("mother", "mobileNumber", e.target.value, form.mother.mobileNumber)}
                 required
               />
             </Field>
@@ -925,10 +1297,17 @@ function ApplyFormContent({ facParam }) {
                 title="कृपया माता की 12-अंकों की आधार संख्या (XXXX-XXXX-XXXX) दर्ज करें"
               />
             </Field>
-            <Field label="ईमेल आई० डी० (Email ID)">
+            <Field label="ईमेल आई० डी० (Email ID)" hint={renderEmailHint(form.mother.email, false)}>
               <input
                 type="email"
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  borderColor: form.mother.email
+                    ? isValidEmail(form.mother.email)
+                      ? "#16a34a"
+                      : "#ef4444"
+                    : undefined,
+                }}
                 placeholder="mother@example.com"
                 value={form.mother.email}
                 onChange={(e) => update("mother", "email", e.target.value)}
@@ -974,13 +1353,14 @@ function ApplyFormContent({ facParam }) {
                 required
               />
             </Field>
-            <Field label="मोबाईल नं० (Mobile Number)" required>
+            <Field label="मोबाईल नं० (Mobile Number)" hint={renderMobileHint(form.father.mobileNumber)} required>
               <input
+                type="tel"
                 style={inputStyle}
-                placeholder="10-digit mobile number"
-                maxLength={10}
+                placeholder="+91 98765 43210"
+                maxLength={15}
                 value={form.father.mobileNumber}
-                onChange={(e) => update("father", "mobileNumber", e.target.value)}
+                onChange={(e) => handleMobileChange("father", "mobileNumber", e.target.value, form.father.mobileNumber)}
                 required
               />
             </Field>
@@ -1000,10 +1380,17 @@ function ApplyFormContent({ facParam }) {
                 title="कृपया पिता की 12-अंकों की आधार संख्या (XXXX-XXXX-XXXX) दर्ज करें"
               />
             </Field>
-            <Field label="ईमेल आई० डी० (Email ID)">
+            <Field label="ईमेल आई० डी० (Email ID)" hint={renderEmailHint(form.father.email, false)}>
               <input
                 type="email"
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  borderColor: form.father.email
+                    ? isValidEmail(form.father.email)
+                      ? "#16a34a"
+                      : "#ef4444"
+                    : undefined,
+                }}
                 placeholder="father@example.com"
                 value={form.father.email}
                 onChange={(e) => update("father", "email", e.target.value)}
@@ -1069,13 +1456,46 @@ function ApplyFormContent({ facParam }) {
                 required
               />
             </Field>
-            <Field label="उप-जिला / प्रखण्ड (Sub-District / Block)" required>
-              <input
+            <Field label="अनुमंडल / उप-जिला (Sub-Division / Sub-District)" required>
+              <select
+                suppressHydrationWarning
                 style={inputStyle}
                 value={form.address.subDistrict}
-                onChange={(e) => update("address", "subDistrict", e.target.value)}
+                onChange={(e) => handleSubDistrictChange("address", e.target.value)}
                 required
-              />
+              >
+                <option value="">-- अनुमंडल चुनें (Select Sub-Division) --</option>
+                {subDivisionsList.map((sub) => (
+                  <option key={sub.id || sub.code} value={sub.displayName || sub.name}>
+                    {sub.displayName || `${sub.name}/${sub.nameHi}`}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="प्रखंड (Block)" required>
+              <select
+                suppressHydrationWarning
+                style={{
+                  ...inputStyle,
+                  cursor: form.address.subDistrict ? "pointer" : "not-allowed",
+                  background: form.address.subDistrict ? "white" : "#f9fafb",
+                }}
+                value={form.address.block}
+                onChange={(e) => update("address", "block", e.target.value)}
+                required
+                disabled={!form.address.subDistrict}
+              >
+                <option value="">
+                  {form.address.subDistrict
+                    ? "-- प्रखंड चुनें (Select Block) --"
+                    : "-- पहले अनुमंडल चुनें (Select Sub-Division first) --"}
+                </option>
+                {getBlocksForSubDivision(form.address.subDistrict, subDivisionsList).map((b) => (
+                  <option key={b.id || b.code} value={b.displayName || b.name}>
+                    {b.displayName || `${b.name}/${b.nameHi}`}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="जिला (District)" required>
               <input
@@ -1093,19 +1513,74 @@ function ApplyFormContent({ facParam }) {
                 required
               />
             </Field>
-            <Field label="पिनकोड (PIN Code)" required>
+            <Field
+              label="पिनकोड (PIN Code)"
+              required
+              hint={
+                form.address.pinCode.length === 6
+                  ? isValidMadhubaniPincode(form.address.pinCode)
+                    ? "✓ मान्य मधुबनी पिनकोड (Valid Madhubani PIN code)"
+                    : "⚠️ यह पिनकोड मधुबनी जिले की सूची में नहीं है (Not in official Madhubani list)"
+                  : "6 अंकों का पिनकोड दर्ज करें (Enter 6-digit PIN)"
+              }
+            >
               <input
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  borderColor:
+                    form.address.pinCode.length === 6
+                      ? isValidMadhubaniPincode(form.address.pinCode)
+                        ? "#16a34a"
+                        : "#f59e0b"
+                      : undefined,
+                }}
                 maxLength={6}
+                placeholder="उदा० 847211"
                 value={form.address.pinCode}
-                onChange={(e) => update("address", "pinCode", e.target.value)}
+                onChange={(e) => handlePincodeChange("address", e.target.value)}
                 required
               />
+            </Field>
+            <Field
+              label="डाकघर (Post Office)"
+              required
+              hint={
+                form.address.pinCode.length === 6
+                  ? getPostOfficesForPincode(form.address.pinCode, postOfficesList).length > 0
+                    ? `${getPostOfficesForPincode(form.address.pinCode, postOfficesList).length} डाकघर उपलब्ध (available)`
+                    : "इस पिनकोड के लिए कोई डाकघर नहीं मिला"
+                  : "पहले 6 अंकों का पिनकोड दर्ज करें"
+              }
+            >
+              <select
+                suppressHydrationWarning
+                style={{
+                  ...inputStyle,
+                  cursor: form.address.pinCode.length === 6 ? "pointer" : "not-allowed",
+                  background: form.address.pinCode.length === 6 ? "white" : "#f9fafb",
+                }}
+                value={form.address.postOffice}
+                onChange={(e) => update("address", "postOffice", e.target.value)}
+                required
+                disabled={form.address.pinCode.length !== 6}
+              >
+                <option value="">
+                  {form.address.pinCode.length === 6
+                    ? "-- डाकघर चुनें (Select Post Office) --"
+                    : "-- पहले पिनकोड दर्ज करें (Enter PIN Code first) --"}
+                </option>
+                {getPostOfficesForPincode(form.address.pinCode, postOfficesList).map((po) => (
+                  <option key={po.id || po.name} value={po.name}>
+                    {po.name}
+                  </option>
+                ))}
+              </select>
             </Field>
           </Grid>
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid #f1f5f9" }}>
             <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
               <input
+                suppressHydrationWarning
                 type="checkbox"
                 checked={form.sameAddress}
                 onChange={(e) => setForm((p) => ({ ...p, sameAddress: e.target.checked }))}
@@ -1176,13 +1651,46 @@ function ApplyFormContent({ facParam }) {
                   required={!form.sameAddress}
                 />
               </Field>
-              <Field label="उप-जिला / प्रखण्ड (Sub-District / Block)" required>
-                <input
+              <Field label="अनुमंडल / उप-जिला (Sub-Division / Sub-District)" required>
+                <select
+                  suppressHydrationWarning
                   style={inputStyle}
                   value={form.permanentAddress.subDistrict}
-                  onChange={(e) => update("permanentAddress", "subDistrict", e.target.value)}
+                  onChange={(e) => handleSubDistrictChange("permanentAddress", e.target.value)}
                   required={!form.sameAddress}
-                />
+                >
+                  <option value="">-- अनुमंडल चुनें (Select Sub-Division) --</option>
+                  {subDivisionsList.map((sub) => (
+                    <option key={sub.id || sub.code} value={sub.displayName || sub.name}>
+                      {sub.displayName || `${sub.name}/${sub.nameHi}`}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="प्रखंड (Block)" required>
+                <select
+                  suppressHydrationWarning
+                  style={{
+                    ...inputStyle,
+                    cursor: form.permanentAddress.subDistrict ? "pointer" : "not-allowed",
+                    background: form.permanentAddress.subDistrict ? "white" : "#f9fafb",
+                  }}
+                  value={form.permanentAddress.block}
+                  onChange={(e) => update("permanentAddress", "block", e.target.value)}
+                  required={!form.sameAddress}
+                  disabled={!form.permanentAddress.subDistrict}
+                >
+                  <option value="">
+                    {form.permanentAddress.subDistrict
+                      ? "-- प्रखंड चुनें (Select Block) --"
+                      : "-- पहले अनुमंडल चुनें (Select Sub-Division first) --"}
+                  </option>
+                  {getBlocksForSubDivision(form.permanentAddress.subDistrict, subDivisionsList).map((b) => (
+                    <option key={b.id || b.code} value={b.displayName || b.name}>
+                      {b.displayName || `${b.name}/${b.nameHi}`}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Field label="जिला (District)" required>
                 <input
@@ -1200,14 +1708,68 @@ function ApplyFormContent({ facParam }) {
                   required={!form.sameAddress}
                 />
               </Field>
-              <Field label="पिनकोड (PIN Code)" required>
+              <Field
+                label="पिनकोड (PIN Code)"
+                required
+                hint={
+                  form.permanentAddress.pinCode.length === 6
+                    ? isValidMadhubaniPincode(form.permanentAddress.pinCode)
+                      ? "✓ मान्य मधुबनी पिनकोड (Valid Madhubani PIN code)"
+                      : "⚠️ यह पिनकोड मधुबनी जिले की सूची में नहीं है (Not in official Madhubani list)"
+                    : "6 अंकों का पिनकोड दर्ज करें (Enter 6-digit PIN)"
+                }
+              >
                 <input
-                  style={inputStyle}
+                  style={{
+                    ...inputStyle,
+                    borderColor:
+                      form.permanentAddress.pinCode.length === 6
+                        ? isValidMadhubaniPincode(form.permanentAddress.pinCode)
+                          ? "#16a34a"
+                          : "#f59e0b"
+                        : undefined,
+                  }}
                   maxLength={6}
+                  placeholder="उदा० 847211"
                   value={form.permanentAddress.pinCode}
-                  onChange={(e) => update("permanentAddress", "pinCode", e.target.value)}
+                  onChange={(e) => handlePincodeChange("permanentAddress", e.target.value)}
                   required={!form.sameAddress}
                 />
+              </Field>
+              <Field
+                label="डाकघर (Post Office)"
+                required
+                hint={
+                  form.permanentAddress.pinCode.length === 6
+                    ? getPostOfficesForPincode(form.permanentAddress.pinCode, postOfficesList).length > 0
+                      ? `${getPostOfficesForPincode(form.permanentAddress.pinCode, postOfficesList).length} डाकघर उपलब्ध (available)`
+                      : "इस पिनकोड के लिए कोई डाकघर नहीं मिला"
+                    : "पहले 6 अंकों का पिनकोड दर्ज करें"
+                }
+              >
+                <select
+                  suppressHydrationWarning
+                  style={{
+                    ...inputStyle,
+                    cursor: form.permanentAddress.pinCode.length === 6 ? "pointer" : "not-allowed",
+                    background: form.permanentAddress.pinCode.length === 6 ? "white" : "#f9fafb",
+                  }}
+                  value={form.permanentAddress.postOffice}
+                  onChange={(e) => update("permanentAddress", "postOffice", e.target.value)}
+                  required={!form.sameAddress}
+                  disabled={form.permanentAddress.pinCode.length !== 6}
+                >
+                  <option value="">
+                    {form.permanentAddress.pinCode.length === 6
+                      ? "-- डाकघर चुनें (Select Post Office) --"
+                      : "-- पहले पिनकोड दर्ज करें (Enter PIN Code first) --"}
+                  </option>
+                  {getPostOfficesForPincode(form.permanentAddress.pinCode, postOfficesList).map((po) => (
+                    <option key={po.id || po.name} value={po.name}>
+                      {po.name}
+                    </option>
+                  ))}
+                </select>
               </Field>
             </Grid>
           </div>
@@ -1248,6 +1810,7 @@ function ApplyFormContent({ facParam }) {
             <Grid>
               <Field label="माता का धर्म (Mother's Religion)" required>
                 <select
+                  suppressHydrationWarning
                   style={inputStyle}
                   value={form.informationProvider.motherReligion}
                   onChange={(e) => update("informationProvider", "motherReligion", e.target.value)}
@@ -1263,6 +1826,7 @@ function ApplyFormContent({ facParam }) {
 
               <Field label="पिता का धर्म (Father's Religion)" required>
                 <select
+                  suppressHydrationWarning
                   style={inputStyle}
                   value={form.informationProvider.fatherReligion}
                   onChange={(e) => update("informationProvider", "fatherReligion", e.target.value)}
@@ -1404,6 +1968,7 @@ function ApplyFormContent({ facParam }) {
 
               <Field label="प्रसव की विधि (Method of Delivery)" hint="[मद 20]" required>
                 <select
+                  suppressHydrationWarning
                   style={inputStyle}
                   value={form.child.deliveryMethod}
                   onChange={(e) => update("child", "deliveryMethod", e.target.value)}
@@ -1423,6 +1988,7 @@ function ApplyFormContent({ facParam }) {
                 required
               >
                 <select
+                  suppressHydrationWarning
                   style={inputStyle}
                   value={form.child.deliveryAttention}
                   onChange={(e) => update("child", "deliveryAttention", e.target.value)}
@@ -1474,6 +2040,7 @@ function ApplyFormContent({ facParam }) {
               required
             >
               <select
+                suppressHydrationWarning
                 style={inputStyle}
                 value={form.informationProvider.relationToChild}
                 onChange={(e) => handleRelationChange(e.target.value)}
@@ -1497,21 +2064,33 @@ function ApplyFormContent({ facParam }) {
               />
             </Field>
 
-            <Field label="मोबाईल नं० (Mobile Number)" required>
+            <Field label="मोबाईल नं० (Mobile Number)" hint={renderMobileHint(form.informationProvider.mobileNumber)} required>
               <input
+                type="tel"
                 style={inputStyle}
-                placeholder="10-digit number for SMS alerts"
-                maxLength={10}
+                placeholder="+91 98765 43210"
+                maxLength={15}
                 value={form.informationProvider.mobileNumber}
-                onChange={(e) => update("informationProvider", "mobileNumber", e.target.value)}
+                onChange={(e) => handleMobileChange("informationProvider", "mobileNumber", e.target.value, form.informationProvider.mobileNumber)}
                 required
               />
             </Field>
 
-            <Field label="ईमेल आई० डी० (Email Address for Official Tracking)" required>
+            <Field
+              label="ईमेल आई० डी० (Email Address for Official Tracking)"
+              hint={renderEmailHint(form.informationProvider.email, true)}
+              required
+            >
               <input
                 type="email"
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  borderColor: form.informationProvider.email
+                    ? isValidEmail(form.informationProvider.email)
+                      ? "#16a34a"
+                      : "#ef4444"
+                    : undefined,
+                }}
                 placeholder="applicant@example.com"
                 value={form.informationProvider.email}
                 onChange={(e) => update("informationProvider", "email", e.target.value)}

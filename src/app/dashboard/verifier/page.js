@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import gsap from "gsap";
 import {
@@ -82,8 +83,26 @@ export default function VerifierDashboard() {
   }, [router]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchApps();
   }, [fetchApps]);
+
+  // Lock background body scroll when any modal is open
+  useEffect(() => {
+    if (viewingApp || showRejectModal || showCrsModal || showUploadModal) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      if (typeof window !== "undefined" && window.__lenis) {
+        window.__lenis.stop();
+      }
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        if (typeof window !== "undefined" && window.__lenis) {
+          window.__lenis.start();
+        }
+      };
+    }
+  }, [viewingApp, showRejectModal, showCrsModal, showUploadModal]);
 
   // GSAP Animations
   useEffect(() => {
@@ -285,11 +304,43 @@ export default function VerifierDashboard() {
       {/* Top Nav */}
       <div className="anim-ver-header" style={{ background: "white", borderBottom: "1px solid #e5e7eb", padding: "0 16px" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 60, flexWrap: "wrap", gap: 10, padding: "8px 0" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Link
+              href="/"
+              style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0 }}
+              title="Government of Bihar"
+            >
+              <img
+                src="/bihar_government.webp"
+                alt="Government of Bihar Seal"
+                style={{
+                  height: 38,
+                  width: "auto",
+                  maxHeight: 38,
+                  objectFit: "contain",
+                  display: "block",
+                }}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/logo.png";
+                }}
+              />
+            </Link>
+
+            <div
+              style={{
+                width: 1,
+                height: 32,
+                backgroundColor: "#cbd5e1",
+                flexShrink: 0,
+              }}
+              aria-hidden="true"
+            />
+
             <img
               src="/baby_birth.svg"
-              alt="Government of Bihar Seal"
-              style={{ width: 34, height: 34, objectFit: "contain", flexShrink: 0 }}
+              alt="Birth Portal Icon"
+              style={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }}
             />
             <div>
               <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", lineHeight: 1.2 }}>Verifier Dashboard</div>
@@ -694,18 +745,25 @@ export default function VerifierDashboard() {
       {/* MODAL 1: VIEW APPLICATION FULL DETAILS & ACTIONS */}
       {/* ========================================================================= */}
       {viewingApp && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 1000, padding: 16, backdropFilter: "blur(4px)",
-        }}>
-          <div style={{
-            background: "white", borderRadius: 18, width: "100%", maxWidth: 820,
-            maxHeight: "92vh", display: "flex", flexDirection: "column",
-            boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)", overflow: "hidden",
+        <div
+          data-lenis-prevent="true"
+          onWheel={(e) => e.stopPropagation()}
+          onClick={(e) => { if (e.target === e.currentTarget) setViewingApp(null); }}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1100, padding: 16, backdropFilter: "blur(4px)",
           }}>
+          <div
+            data-lenis-prevent="true"
+            onWheel={(e) => e.stopPropagation()}
+            style={{
+              background: "white", borderRadius: 18, width: "100%", maxWidth: 820,
+              maxHeight: "90vh", display: "flex", flexDirection: "column",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)", overflow: "hidden",
+            }}>
             {/* Modal Header */}
-            <div style={{ padding: "16px 22px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc" }}>
+            <div style={{ padding: "16px 22px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", flexShrink: 0 }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <h3 style={{ fontSize: 17, fontWeight: 800, color: "#0f172a", margin: 0 }}>
@@ -731,7 +789,18 @@ export default function VerifierDashboard() {
             </div>
 
             {/* Modal Body */}
-            <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1 }}>
+            <div
+              data-lenis-prevent="true"
+              onWheel={(e) => e.stopPropagation()}
+              style={{
+                padding: "20px 24px",
+                overflowY: "auto",
+                flex: 1,
+                minHeight: 0,
+                maxHeight: "calc(90vh - 130px)",
+                overscrollBehavior: "contain",
+                WebkitOverflowScrolling: "touch",
+              }}>
               {/* Rejection / Note banner if present */}
               {viewingApp.remarks && (
                 <div style={{
@@ -824,7 +893,7 @@ export default function VerifierDashboard() {
             </div>
 
             {/* Modal Bottom Actions */}
-            <div style={{ padding: "14px 22px", borderTop: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+            <div style={{ padding: "14px 22px", borderTop: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, flexShrink: 0 }}>
               <button
                 onClick={() => setViewingApp(null)}
                 style={{
@@ -889,18 +958,27 @@ export default function VerifierDashboard() {
       )}
 
       {/* ========================================================================= */}
+      {/* ========================================================================= */}
       {/* MODAL 2: REJECT APPLICATION WITH MANDATORY REASON */}
       {/* ========================================================================= */}
       {showRejectModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 1100, padding: 16, backdropFilter: "blur(4px)",
-        }}>
-          <div style={{
-            background: "white", borderRadius: 18, padding: "24px 28px",
-            maxWidth: 520, width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+        <div
+          data-lenis-prevent="true"
+          onWheel={(e) => e.stopPropagation()}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowRejectModal(null); setRejectionReason(""); } }}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1100, padding: 16, backdropFilter: "blur(4px)",
           }}>
+          <div
+            data-lenis-prevent="true"
+            onWheel={(e) => e.stopPropagation()}
+            style={{
+              background: "white", borderRadius: 18, padding: "24px 28px",
+              maxWidth: 520, width: "100%", maxHeight: "90vh", overflowY: "auto", overscrollBehavior: "contain",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+            }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
               <ShieldAlert size={24} color="#dc2626" />
               <h3 style={{ fontSize: 18, fontWeight: 800, color: "#111827", margin: 0 }}>
@@ -975,15 +1053,23 @@ export default function VerifierDashboard() {
       {/* MODAL 3: APPLY ON CRS PORTAL */}
       {/* ========================================================================= */}
       {showCrsModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 1100, padding: 16, backdropFilter: "blur(4px)",
-        }}>
-          <div style={{
-            background: "white", borderRadius: 18, padding: "24px 28px",
-            maxWidth: 500, width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+        <div
+          data-lenis-prevent="true"
+          onWheel={(e) => e.stopPropagation()}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowCrsModal(null); setCrsNumber(""); setCrsRemarks(""); } }}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1100, padding: 16, backdropFilter: "blur(4px)",
           }}>
+          <div
+            data-lenis-prevent="true"
+            onWheel={(e) => e.stopPropagation()}
+            style={{
+              background: "white", borderRadius: 18, padding: "24px 28px",
+              maxWidth: 500, width: "100%", maxHeight: "90vh", overflowY: "auto", overscrollBehavior: "contain",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+            }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
               <Globe size={24} color="#2563eb" />
               <h3 style={{ fontSize: 18, fontWeight: 800, color: "#111827", margin: 0 }}>
@@ -1056,15 +1142,23 @@ export default function VerifierDashboard() {
       {/* MODAL 4: UPLOAD CERTIFICATE */}
       {/* ========================================================================= */}
       {showUploadModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 1100, padding: 16, backdropFilter: "blur(4px)",
-        }}>
-          <div style={{
-            background: "white", borderRadius: 18, padding: "24px 28px",
-            maxWidth: 500, width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+        <div
+          data-lenis-prevent="true"
+          onWheel={(e) => e.stopPropagation()}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowUploadModal(null); setUploadFile(null); } }}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1100, padding: 16, backdropFilter: "blur(4px)",
           }}>
+          <div
+            data-lenis-prevent="true"
+            onWheel={(e) => e.stopPropagation()}
+            style={{
+              background: "white", borderRadius: 18, padding: "24px 28px",
+              maxWidth: 500, width: "100%", maxHeight: "90vh", overflowY: "auto", overscrollBehavior: "contain",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+            }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
               <Upload size={24} color="#7c3aed" />
               <h3 style={{ fontSize: 18, fontWeight: 800, color: "#111827", margin: 0 }}>

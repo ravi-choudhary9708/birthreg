@@ -78,9 +78,11 @@ model ChildDetail {
   birthVillage      String      @map("birth_village")
   birthWardNumber   String?     @map("birth_ward_number")
   birthSubDistrict  String      @map("birth_sub_district")
+  birthBlock        String?     @map("birth_block")
   birthDistrict     String      @map("birth_district")
   birthState        String      @map("birth_state")
   birthPinCode      String      @map("birth_pin_code")
+  birthPostOffice   String?     @map("birth_post_office")
 
   @@map("child_details")
 }
@@ -108,9 +110,11 @@ model ParentDetail {
   presentVillage       String      @map("present_village")
   presentWardNumber    String?     @map("present_ward_number")
   presentSubDistrict   String      @map("present_sub_district")
+  presentBlock         String?     @map("present_block")
   presentDistrict      String      @map("present_district")
   presentState         String      @map("present_state")
   presentPinCode       String      @map("present_pin_code")
+  presentPostOffice    String?     @map("present_post_office")
 
   // Permanent Address
   permPlotNumber       String?     @map("perm_plot_number")
@@ -118,9 +122,11 @@ model ParentDetail {
   permVillage          String      @map("perm_village")
   permWardNumber       String?     @map("perm_ward_number")
   permSubDistrict      String      @map("perm_sub_district")
+  permBlock            String?     @map("perm_block")
   permDistrict         String      @map("perm_district")
   permState            String      @map("perm_state")
   permPinCode          String      @map("perm_pin_code")
+  permPostOffice       String?     @map("perm_post_office")
 
   @@map("parent_details")
 }
@@ -141,16 +147,20 @@ model InformantDetail {
   informantVillage     String      @map("informant_village")
   informantWardNumber  String?     @map("informant_ward_number")
   informantSubDistrict String      @map("informant_sub_district")
+  informantBlock       String?     @map("informant_block")
   informantDistrict    String      @map("informant_district")
   informantState       String      @map("informant_state")
   informantPinCode     String      @map("informant_pin_code")
+  informantPostOffice  String?     @map("informant_post_office")
 
   // Mother Address at Birth
   motherCity           String      @map("mother_city")
   motherSubDistrict    String      @map("mother_sub_district")
+  motherBlock          String?     @map("mother_block")
   motherDistrict       String      @map("mother_district")
   motherState          String      @map("mother_state")
   motherPinCode        String      @map("mother_pin_code")
+  motherPostOffice     String?     @map("mother_post_office")
 
   // Socio-economic / Statistical
   motherReligion       String      @map("mother_religion")
@@ -166,4 +176,48 @@ model InformantDetail {
   declarationAccepted  Boolean     @default(false) @map("declaration_accepted")
 
   @@map("informant_details")
+}
+
+model SubDivision {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique
+  name        String
+  nameHi      String   @map("name_hi")
+  displayName String   @map("display_name")
+  district    String   @default("Madhubani")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  blocks      Block[]
+
+  @@map("sub_divisions")
+}
+
+model Block {
+  id            String      @id @default(uuid()) @db.Uuid
+  code          String
+  name          String
+  nameHi        String      @map("name_hi")
+  displayName   String      @map("display_name")
+  subDivisionId String      @map("sub_division_id") @db.Uuid
+  subDivision   SubDivision @relation(fields: [subDivisionId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@unique([subDivisionId, name])
+  @@index([subDivisionId])
+  @@map("blocks")
+}
+
+model PostOffice {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  pincode   String
+  district  String   @default("MADHUBANI")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([pincode, name])
+  @@index([pincode])
+  @@map("post_offices")
 }

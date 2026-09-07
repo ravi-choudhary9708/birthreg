@@ -21,8 +21,31 @@ export async function POST(request) {
         if (!facility || !child || !parents || !informationProvider) {
             throw new apiError(400, "All sections of the form are required");
         }
-        if (!parents.mother?.mobileNumber) {
-            throw new apiError(400, "Parent contact information is required");
+        const isValidMobile = (num) => {
+            if (!num || typeof num !== "string") return false;
+            const digits = num.replace(/^\+91\s*/, "").replace(/\D/g, "");
+            return digits.length === 10;
+        };
+
+        if (!isValidMobile(parents.mother?.mobileNumber)) {
+            throw new apiError(400, "Mother's 10-digit mobile number is mandatory (+91 XXXXXXXXXX)");
+        }
+        if (!isValidMobile(parents.father?.mobileNumber)) {
+            throw new apiError(400, "Father's 10-digit mobile number is mandatory (+91 XXXXXXXXXX)");
+        }
+        if (informationProvider?.mobileNumber && !isValidMobile(informationProvider.mobileNumber)) {
+            throw new apiError(400, "Information provider's 10-digit mobile number is invalid (+91 XXXXXXXXXX)");
+        }
+
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!informationProvider?.email || !emailRegex.test(informationProvider.email.trim())) {
+            throw new apiError(400, "Valid email address for Information Provider is required for official status tracking & certificate delivery");
+        }
+        if (parents.mother?.email && parents.mother.email.trim() && !emailRegex.test(parents.mother.email.trim())) {
+            throw new apiError(400, "Mother's email address format is invalid");
+        }
+        if (parents.father?.email && parents.father.email.trim() && !emailRegex.test(parents.father.email.trim())) {
+            throw new apiError(400, "Father's email address format is invalid");
         }
         const aadhaarPattern = /^\d{4}-\d{4}-\d{4}$/;
         if (!parents.mother?.adharNumber || !aadhaarPattern.test(parents.mother.adharNumber.trim())) {
