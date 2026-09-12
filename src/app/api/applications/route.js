@@ -66,6 +66,24 @@ export async function POST(request) {
             throw new apiError(400, "Statutory declaration under Section 23 of Registration of Births and Deaths Act must be accepted");
         }
 
+        // Check if the health facility's verification unit is active
+        const facilityVerifiers = await prisma.user.findMany({
+            where: {
+                facility: {
+                    equals: facility.trim(),
+                    mode: "insensitive",
+                },
+                role: "verifier",
+            },
+        });
+
+        if (facilityVerifiers.length > 0 && facilityVerifiers.every(v => v.isActive === false)) {
+            throw new apiError(
+                400,
+                `इस स्वास्थ्य केंद्र (${facility}) की सत्यापन इकाई को ऑपरेटर सेंट्रल द्वारा निष्क्रिय (Inactive) किया गया है। वर्तमान में इस अस्पताल के लिए नए आवेदन स्वीकार नहीं किए जा सकते। (Applications cannot be accepted for this facility at this time because the facility verification unit is inactive.)`
+            );
+        }
+
         // Generate unique application number
         let applicationNumber;
         let exists = true;

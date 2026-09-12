@@ -15,6 +15,19 @@ export async function POST(request, { params }) {
             throw new apiError(403, "Only verifiers or authorized operators can upload certificates");
         }
 
+        if (role === "verifier") {
+            const userId = request.headers.get("x-user-id");
+            if (userId) {
+                const user = await prisma.user.findUnique({
+                    where: { id: userId },
+                    select: { isActive: true },
+                });
+                if (user && user.isActive === false) {
+                    throw new apiError(403, "Your verifier account has been deactivated by Operator Central.");
+                }
+            }
+        }
+
         const { id } = await params;
 
         const application = await prisma.application.findUnique({

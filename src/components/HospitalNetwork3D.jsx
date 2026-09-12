@@ -7,7 +7,15 @@ export default function HospitalNetwork3D({ facilities = [], onSelectFacility })
   const mountRef = useRef(null);
   const [hoveredFacility, setHoveredFacility] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
-  const [isSupported, setIsSupported] = useState(true);
+  const [isSupported] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const testCanvas = document.createElement("canvas");
+      return Boolean(testCanvas.getContext("webgl") || testCanvas.getContext("experimental-webgl"));
+    } catch {
+      return false;
+    }
+  });
 
   // Quick stats computed for the 3D header
   const totalOverdue = useMemo(() => {
@@ -15,21 +23,9 @@ export default function HospitalNetwork3D({ facilities = [], onSelectFacility })
   }, [facilities]);
 
   useEffect(() => {
+    if (!isSupported) return;
     const container = mountRef.current;
     if (!container) return;
-
-    // 1. WebGL Support Detection
-    try {
-      const testCanvas = document.createElement("canvas");
-      const gl = testCanvas.getContext("webgl") || testCanvas.getContext("experimental-webgl");
-      if (!gl) {
-        setIsSupported(false);
-        return;
-      }
-    } catch {
-      setIsSupported(false);
-      return;
-    }
 
     // 2. Scene, Camera, Renderer Setup
     const width = container.clientWidth;
@@ -83,10 +79,10 @@ export default function HospitalNetwork3D({ facilities = [], onSelectFacility })
     ring.rotation.x = Math.PI / 2;
     centralGroup.add(ring);
 
-    // 4. Position 39 Hospital Nodes in an organic district grid
+    // 4. Position Hospital Nodes in an organic district grid
     const nodeMeshes = [];
     const connectionLines = [];
-    const count = facilities.length || 39;
+    const count = facilities.length || 606;
 
     // Procedural particle geometry for nodes
     const nodeGeo = new THREE.SphereGeometry(0.42, 10, 10);
@@ -242,15 +238,22 @@ export default function HospitalNetwork3D({ facilities = [], onSelectFacility })
 
     // 9. Render Loop
     let animationId;
-    let clock = new THREE.Clock();
+    const timer = typeof THREE.Timer === "function" ? new THREE.Timer() : null;
+    const startTime = performance.now();
 
-    const animate = () => {
+    const animate = (timestamp) => {
       animationId = requestAnimationFrame(animate);
 
       // Pause WebGL compute when scrolled off screen
       if (!isVisible) return;
 
-      const elapsed = clock.getElapsedTime();
+      let elapsed;
+      if (timer) {
+        timer.update(timestamp);
+        elapsed = timer.getElapsed();
+      } else {
+        elapsed = (performance.now() - startTime) * 0.001;
+      }
 
       // Smooth camera orbit
       if (!isDragging) {
@@ -368,9 +371,10 @@ export default function HospitalNetwork3D({ facilities = [], onSelectFacility })
       if (renderer.domElement && container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
+      timer?.dispose?.();
       renderer.dispose();
     };
-  }, [facilities, onSelectFacility]);
+  }, [facilities, onSelectFacility, isSupported]);
 
   // Graceful 2D Fallback for legacy devices without WebGL
   if (!isSupported) {
@@ -380,7 +384,7 @@ export default function HospitalNetwork3D({ facilities = [], onSelectFacility })
         borderRadius: 16, padding: 30, color: "white", textAlign: "center",
       }}>
         <ShieldAlert size={36} color="#fbbf24" style={{ margin: "0 auto 10px" }} />
-        <h4 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700 }}>39 Facilities Digital Grid (2D Mode)</h4>
+        <h4 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700 }}>{facilities.length || 606} Facilities Digital Grid (2D Mode)</h4>
         <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>
           Active monitoring: {facilities.length} health centers • {totalOverdue} overdue applications.
         </p>
@@ -398,7 +402,7 @@ export default function HospitalNetwork3D({ facilities = [], onSelectFacility })
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(8px)", padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)" }}>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: totalOverdue > 0 ? "#ef4444" : "#10b981", display: "inline-block", boxShadow: totalOverdue > 0 ? "0 0 8px #ef4444" : "0 0 8px #10b981" }} />
           <span style={{ fontSize: 12, fontWeight: 700, color: "#f8fafc", letterSpacing: "0.5px" }}>
-            DIGITAL BIHAR • 39 HEALTH FACILITIES TOPOLOGY
+            DIGITAL BIHAR • {facilities.length || 606} HEALTH FACILITIES TOPOLOGY
           </span>
         </div>
         <p style={{ margin: "6px 0 0 2px", fontSize: 11, color: "#94a3b8" }}>
@@ -433,7 +437,7 @@ export default function HospitalNetwork3D({ facilities = [], onSelectFacility })
       {hoveredFacility && (
         <div style={{
           position: "absolute",
-          left: Math.min(Math.max(10, tooltipPos.x + 12), (mountRef.current?.clientWidth || 300) - 260),
+          left: tooltipPos.x > 260 ? Math.max(10, tooltipPos.x - 270) : tooltipPos.x + 12,
           top: Math.max(10, tooltipPos.y - 75),
           pointerEvents: "none",
           zIndex: 50,

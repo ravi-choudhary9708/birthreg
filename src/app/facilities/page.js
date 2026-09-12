@@ -5,555 +5,101 @@ import Image from "next/image";
 import { useState, useMemo, useEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { FACILITIES } from "@/utils/constants";
-
-// Comprehensive verified directory data for all 39 healthcare facilities in Madhubani District
-const FACILITY_CONTACTS = {
-  "REFERRAL HOSPITAL ANDHRATHARI": {
-    block: "Andhrathari",
-    pin: "847401",
-    phone: "06276-284201",
-    altPhone: "+91 9470003434",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "Hospital Road, Andhrathari Block HQ, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["24x7 Delivery", "Referral Care", "Immunization", "CRS Registration"],
-  },
-  "PHC ANDHRATHADHI": {
-    block: "Andhrathari",
-    pin: "847401",
-    phone: "06276-284201",
-    altPhone: "+91 9470003434",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Campus, Andhrathadhi, Madhubani",
-    timing: "24x7 Emergency & Delivery / 9 AM - 5 PM Registry",
-    features: ["Delivery Wing", "Primary Healthcare", "CRS Registration"],
-  },
-  "PHC BABUBARHI": {
-    block: "Babubarhi",
-    pin: "847224",
-    phone: "+91 9470003434",
-    altPhone: "06276-224425",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Campus, Babubarhi Block HQ, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Maternity Care", "Primary Outpatient", "CRS Registration"],
-  },
-  "CHC BABUBARHI": {
-    block: "Babubarhi",
-    pin: "847224",
-    phone: "+91 9470003434",
-    altPhone: "06276-222050",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "Community Health Centre, Babubarhi Market Road, Madhubani",
-    timing: "24x7 Emergency & Inpatient / 9 AM - 5 PM Registry",
-    features: ["Inpatient Beds", "24x7 Delivery", "SNCU Support", "CRS Registration"],
-  },
-  "PRIMARY HEALTH CENTRE BASOPATTI": {
-    block: "Basopatti",
-    pin: "847225",
-    phone: "+91 9470003434",
-    altPhone: "06276-224425",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "Hospital Road, Basopatti Block, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Maternity Care", "Immunization", "CRS Registration"],
-  },
-  "PHC BENIPATTI MADHUBANI": {
-    block: "Benipatti",
-    pin: "847223",
-    phone: "06271-222078",
-    altPhone: "+91 9470003434",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "SH-52, Benipatti Sub-Division, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Sub-Divisional Hub", "24x7 Maternity", "Emergency Wing", "CRS Registration"],
-  },
-  "PRIMARI HEALTH CENTRE BISFI": {
-    block: "Bisfi",
-    pin: "847122",
-    phone: "+91 9470003434",
-    altPhone: "06276-224425",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "Block Headquarters Road, Bisfi, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Delivery Wing", "Child Healthcare", "CRS Registration"],
-  },
-  "CHC BISFI": {
-    block: "Bisfi",
-    pin: "847122",
-    phone: "+91 9470003434",
-    altPhone: "06276-222050",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "CHC Complex, Near Block Office, Bisfi, Madhubani",
-    timing: "24x7 Emergency & Inpatient / 9 AM - 5 PM Registry",
-    features: ["Inpatient Beds", "24x7 Maternity Care", "CRS Registration"],
-  },
-  "PHC GHOGHARDIHA": {
-    block: "Ghoghardiha",
-    pin: "847402",
-    phone: "06277-282770",
-    altPhone: "+91 9470003438",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Hospital Campus, Ghoghardiha, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["24x7 Delivery Care", "Emergency Outpatient", "CRS Registration"],
-  },
-  "PHC HARLAKHI": {
-    block: "Harlakhi",
-    pin: "847240",
-    phone: "+91 9470003434",
-    altPhone: "06276-224425",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Umgaon, Harlakhi Block, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Maternity Care", "Primary Outpatient", "CRS Registration"],
-  },
-  "CHC HARLAKHI": {
-    block: "Harlakhi",
-    pin: "847240",
-    phone: "+91 9470003434",
-    altPhone: "06276-222050",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "CHC Campus, Umgaon-Harlakhi Road, Madhubani",
-    timing: "24x7 Emergency & Inpatient / 9 AM - 5 PM Registry",
-    features: ["Inpatient Beds", "24x7 Delivery Hub", "CRS Registration"],
-  },
-  "SUB DIVISIONAL HOSPITAL, JAYNAGAR": {
-    block: "Jaynagar",
-    pin: "847226",
-    phone: "06246-222117",
-    altPhone: "+91 9470003435",
-    emergency: "102 / 108 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "Station Road, Sub-Divisional Hospital Campus, Jaynagar, Madhubani",
-    timing: "24x7 Multi-Specialty, Emergency & Maternity",
-    features: ["Sub-Divisional Apex", "SNCU Newborn Care", "Operation Theatre", "CRS Registration"],
-  },
-  "PRIMARY HEALTH CENTRE JAYNAGAR": {
-    block: "Jaynagar",
-    pin: "847226",
-    phone: "06246-222117",
-    altPhone: "+91 9470003434",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Complex, Main Market, Jaynagar, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Delivery Wing", "Immunization", "CRS Registration"],
-  },
-  "SUPRITENDENT SUB DIVISIONAL HOSPITAL JHANJHARPUR": {
-    block: "Jhanjharpur",
-    pin: "847404",
-    phone: "06273-222230",
-    altPhone: "+91 9470003436",
-    emergency: "102 / 108 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "Court Compound Road, SDH Campus, Jhanjharpur Sub-Division, Madhubani",
-    timing: "24x7 Multi-Specialty, Inpatient & Maternity Care",
-    features: ["Sub-Divisional Apex", "SNCU Newborn Unit", "Trauma & Maternity", "CRS Registration"],
-  },
-  "PRIMARY HEALTH CENTRE JHANJHARPUR": {
-    block: "Jhanjharpur",
-    pin: "847404",
-    phone: "06273-222230",
-    altPhone: "+91 9470003434",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Campus, Near Railway Station, Jhanjharpur, Madhubani",
-    timing: "24x7 Emergency & Delivery / 9 AM - 5 PM Registry",
-    features: ["Delivery Ward", "Primary Care", "CRS Registration"],
-  },
-  "PHC KALUAHI": {
-    block: "Kaluahi",
-    pin: "847229",
-    phone: "+91 9470003434",
-    altPhone: "06276-224425",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Campus, Kaluahi Block HQ, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Maternity Care", "Immunization Registry", "CRS Registration"],
-  },
-  "CHC KALUAHI": {
-    block: "Kaluahi",
-    pin: "847229",
-    phone: "+91 9470003434",
-    altPhone: "06276-222050",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "Community Health Centre, Kaluahi, Madhubani",
-    timing: "24x7 Emergency & Inpatient / 9 AM - 5 PM Registry",
-    features: ["Inpatient Beds", "24x7 Delivery Hub", "CRS Registration"],
-  },
-  "PRIMARY HEALTH CENTRE KHAJAULI": {
-    block: "Khajauli",
-    pin: "847228",
-    phone: "+91 9470003434",
-    altPhone: "06276-224425",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "Hospital Road, Khajauli Block HQ, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Maternity Wing", "Primary Outpatient", "CRS Registration"],
-  },
-  "CHC KHAJAULI": {
-    block: "Khajauli",
-    pin: "847228",
-    phone: "+91 9470003434",
-    altPhone: "06276-222050",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "CHC Complex, Station Road, Khajauli, Madhubani",
-    timing: "24x7 Emergency & Inpatient / 9 AM - 5 PM Registry",
-    features: ["Inpatient Beds", "24x7 Delivery Care", "CRS Registration"],
-  },
-  "PHC KHUTAUNA": {
-    block: "Khutauna",
-    pin: "847227",
-    phone: "+91 9470003434",
-    altPhone: "06276-224425",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Campus, Khutauna Block HQ, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Maternity Care", "Child Immunization", "CRS Registration"],
-  },
-  "CHC KHUTAUNA": {
-    block: "Khutauna",
-    pin: "847227",
-    phone: "+91 9470003434",
-    altPhone: "06276-222050",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "Community Health Centre, Khutauna, Madhubani",
-    timing: "24x7 Emergency & Inpatient / 9 AM - 5 PM Registry",
-    features: ["Inpatient Beds", "24x7 Delivery Hub", "CRS Registration"],
-  },
-  "PRIMARY HEALTH CENTRE LADANIA": {
-    block: "Ladania",
-    pin: "847232",
-    phone: "06276-275198",
-    altPhone: "+91 9470003434",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Campus, Ladania Block HQ, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Maternity Care", "Primary Outpatient", "CRS Registration"],
-  },
-  "CHC LADANIA": {
-    block: "Ladania",
-    pin: "847232",
-    phone: "06276-275198",
-    altPhone: "+91 9470003434",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "CHC Campus, Border Road, Ladania, Madhubani",
-    timing: "24x7 Emergency & Inpatient / 9 AM - 5 PM Registry",
-    features: ["Inpatient Beds", "24x7 Delivery Care", "CRS Registration"],
-  },
-  "PRIMARY HEALTH CENTRE LAKHNAUR": {
-    block: "Lakhnaur",
-    pin: "847103",
-    phone: "+91 9470003434",
-    altPhone: "06276-224425",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Complex, Lakhnaur Block HQ, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Maternity Ward", "Primary Care", "CRS Registration"],
-  },
-  "CHC LAKHNAUR": {
-    block: "Lakhnaur",
-    pin: "847103",
-    phone: "+91 9470003434",
-    altPhone: "06276-222050",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "CHC Campus, Near Block Office, Lakhnaur, Madhubani",
-    timing: "24x7 Emergency & Inpatient / 9 AM - 5 PM Registry",
-    features: ["Inpatient Beds", "24x7 Delivery Hub", "CRS Registration"],
-  },
-  "PHC LAUKAHI MADHUBANI": {
-    block: "Laukahi",
-    pin: "847421",
-    phone: "+91 9470003434",
-    altPhone: "06276-224425",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Campus, Laukahi Market Road, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Delivery Ward", "Primary Care", "CRS Registration"],
-  },
-  "CHC LAUKAHI": {
-    block: "Laukahi",
-    pin: "847421",
-    phone: "+91 9470003434",
-    altPhone: "06276-222050",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "CHC Complex, Main Road, Laukahi, Madhubani",
-    timing: "24x7 Emergency & Inpatient / 9 AM - 5 PM Registry",
-    features: ["Inpatient Beds", "24x7 Delivery Hub", "CRS Registration"],
-  },
-  "PRIMARY HEALTH CENTRE MADHEPUR": {
-    block: "Madhepur",
-    pin: "847408",
-    phone: "+91 9470003434",
-    altPhone: "06276-224425",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Hospital Road, Madhepur Block HQ, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Maternity Care", "Primary Outpatient", "CRS Registration"],
-  },
-  "SADAR HOSPITAL MADHUBANI": {
-    block: "Madhubani Sadar",
-    pin: "847211",
-    phone: "06276-222050",
-    altPhone: "+91 9470003434",
-    emergency: "102 / 108 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "Hospital Road, Near DM Office & Civil Court, Madhubani Sadar",
-    timing: "24x7 District Apex Emergency, Trauma & Maternity",
-    features: [
-      "District Apex Hospital",
-      "Special Newborn Care Unit (SNCU)",
-      "MCH Comprehensive Wing",
-      "District Blood Bank",
-      "Central CRS Civil Registry",
-    ],
-  },
-  "PRIMARY HEALTH CENTRE MADHWAPUR": {
-    block: "Madhwapur",
-    pin: "847305",
-    phone: "06271-283383",
-    altPhone: "+91 9470003434",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Campus, Madhwapur Block HQ, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Maternity Care", "Immunization", "CRS Registration"],
-  },
-  "CHC MADHWAPUR": {
-    block: "Madhwapur",
-    pin: "847305",
-    phone: "06271-283383",
-    altPhone: "+91 9470003434",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "Community Health Centre, Madhwapur, Madhubani",
-    timing: "24x7 Emergency & Inpatient / 9 AM - 5 PM Registry",
-    features: ["Inpatient Beds", "24x7 Delivery Hub", "CRS Registration"],
-  },
-  "APHC MAHRAIL": {
-    block: "Andhrathari",
-    pin: "847401",
-    phone: "+91 9470003434",
-    altPhone: "06276-284201",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "Additional PHC, Mahrail Village, Andhrathari Block, Madhubani",
-    timing: "24x7 Maternity & Primary Outpatient / 9 AM - 5 PM Registry",
-    features: ["Maternity Services", "Primary Health", "CRS Registration"],
-  },
-  "PRIMARY HEALTH CENTRE PANDAUL": {
-    block: "Pandaul",
-    pin: "847234",
-    phone: "+91 9470003434",
-    altPhone: "06276-224425",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Campus, Sakri-Pandaul Road, Pandaul, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Maternity Care", "Primary Outpatient", "CRS Registration"],
-  },
-  "SUPRITENDENT SUB DIVISIONAL HOSPITAL PHULPARAS": {
-    block: "Phulparas",
-    pin: "847409",
-    phone: "06277-224210",
-    altPhone: "+91 9470003437",
-    emergency: "102 / 108 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "NH-57, SDH Campus, Phulparas Sub-Division, Madhubani",
-    timing: "24x7 Multi-Specialty, Trauma & Maternity Hub",
-    features: ["Sub-Divisional Apex", "Trauma & Delivery", "Inpatient Beds", "CRS Registration"],
-  },
-  "PRIMARY HEALTH CENTRE PHULPARAS": {
-    block: "Phulparas",
-    pin: "847409",
-    phone: "06277-224210",
-    altPhone: "+91 9470003434",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Campus, Phulparas Block HQ, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Delivery Ward", "Immunization", "CRS Registration"],
-  },
-  "PRIMARY HEALTH CENTER RAHIKA": {
-    block: "Rahika",
-    pin: "847238",
-    phone: "+91 9470003434",
-    altPhone: "06276-222050",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Campus, Rahika Block HQ, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Maternity Ward", "Primary Care", "CRS Registration"],
-  },
-  "CHC RAHIKA": {
-    block: "Rahika",
-    pin: "847238",
-    phone: "+91 9470003434",
-    altPhone: "06276-222050",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "CHC Campus, Rahika-Madhubani Main Road, Rahika, Madhubani",
-    timing: "24x7 Emergency & Inpatient / 9 AM - 5 PM Registry",
-    features: ["Inpatient Beds", "24x7 Delivery Care", "CRS Registration"],
-  },
-  "PRIMARY HEALTH CENTRE RAJNAGAR": {
-    block: "Rajnagar",
-    pin: "847235",
-    phone: "+91 9470003434",
-    altPhone: "06276-224425",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "PHC Campus, Near Rajnagar Heritage Complex, Rajnagar, Madhubani",
-    timing: "24x7 Emergency & Maternity / 9 AM - 5 PM Registry",
-    features: ["Maternity Care", "Primary Outpatient", "CRS Registration"],
-  },
-  "CHC RAJNAGAR": {
-    block: "Rajnagar",
-    pin: "847235",
-    phone: "+91 9470003434",
-    altPhone: "06276-222050",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "CHC Complex, Main Market, Rajnagar Block, Madhubani",
-    timing: "24x7 Emergency & Inpatient / 9 AM - 5 PM Registry",
-    features: ["Inpatient Beds", "24x7 Delivery Hub", "CRS Registration"],
-  },
-};
-
-function getFacilityMeta(name) {
-  const contact = FACILITY_CONTACTS[name] || {
-    block: "Madhubani",
-    pin: "847211",
-    phone: "+91 9470003434",
-    altPhone: "06276-222050",
-    emergency: "102 / 104",
-    email: "cs-madhubani-bih@gov.in",
-    address: "Health Facility Campus, Madhubani District, Bihar",
-    timing: "24x7 Delivery & Emergency / 9 AM - 5 PM Registry",
-    features: ["Birth Registration", "Maternity Care"],
-  };
-
-  if (name.includes("SADAR HOSPITAL")) {
-    return {
-      name,
-      categoryKey: "SADAR",
-      type: "District Apex Hospital",
-      tag: "District Apex Hospital",
-      badgeColor: "#92400e",
-      badgeBg: "#fef3c7",
-      badgeBorder: "#fde68a",
-      icon: "🏥",
-      level: "Apex Civil Hospital",
-      ...contact,
-    };
-  }
-
-  if (name.includes("SUB DIVISIONAL") || name.includes("REFERRAL")) {
-    return {
-      name,
-      categoryKey: "SDH",
-      type: "Sub-Divisional / Referral Hospital",
-      tag: "SDH / Referral Hub",
-      badgeColor: "#6b21a8",
-      badgeBg: "#f3e8ff",
-      badgeBorder: "#e9d5ff",
-      icon: "🏛️",
-      level: "Secondary Referral Hub",
-      ...contact,
-    };
-  }
-
-  if (name.startsWith("CHC ") || name.includes(" CHC")) {
-    return {
-      name,
-      categoryKey: "CHC",
-      type: "Community Health Centre",
-      tag: "CHC (Community Hub)",
-      badgeColor: "#065f46",
-      badgeBg: "#ecfdf5",
-      badgeBorder: "#a7f3d0",
-      icon: "🏨",
-      level: "Community Health Centre",
-      ...contact,
-    };
-  }
-
-  return {
-    name,
-    categoryKey: "PHC",
-    type: name.includes("APHC") ? "Additional Primary Health Centre" : "Primary Health Centre",
-    tag: name.includes("APHC") ? "APHC" : "PHC (Primary Care)",
-    badgeColor: "#1e40af",
-    badgeBg: "#eff6ff",
-    badgeBorder: "#bfdbfe",
-    icon: "🩺",
-    level: "Primary Care Registry",
-    ...contact,
-  };
-}
-
-const FACILITY_METAS = FACILITIES.map(getFacilityMeta);
-
-const CATEGORY_TABS = [
-  { key: "ALL", label: "All Facilities", count: 39 },
-  { key: "SADAR", label: "District Hospital", count: 1 },
-  { key: "SDH", label: "Sub-Divisional & Referral", count: 4 },
-  { key: "CHC", label: "CHCs (Community)", count: 12 },
-  { key: "PHC", label: "PHCs & APHCs", count: 22 },
-];
+// Facilities data is loaded dynamically from PostgreSQL database via /api/facilities
 
 export default function FacilitiesPage() {
   const containerRef = useRef(null);
   const cardsGridRef = useRef(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [facilities, setFacilities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [selectedBlock, setSelectedBlock] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [copiedPhone, setCopiedPhone] = useState(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const ITEMS_PER_PAGE = 24;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetch("/api/facilities")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load facilities directory from database");
+        return res.json();
+      })
+      .then((json) => {
+        if (isMounted) {
+          if (json.success && Array.isArray(json.data?.facilities)) {
+            setFacilities(json.data.facilities);
+          } else {
+            setFacilities([]);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Database fetch error in facilities page:", err);
+        if (isMounted) setFetchError(err.message);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const allBlocks = useMemo(() => {
+    return Array.from(new Set(facilities.map((f) => f.block).filter(Boolean))).sort();
+  }, [facilities]);
+
+  const categoryTabs = useMemo(() => [
+    { key: "ALL", label: "All Facilities", count: facilities.length },
+    { key: "DH", label: "District Hospital", count: facilities.filter((f) => f.categoryKey === "DH" || f.type === "DH").length },
+    { key: "SDH", label: "Sub-Divisional (SDH)", count: facilities.filter((f) => f.categoryKey === "SDH" || f.type === "SDH").length },
+    { key: "CHC", label: "Community Health (CHC)", count: facilities.filter((f) => f.categoryKey === "CHC" || f.type === "CHC").length },
+    { key: "PHC", label: "Primary Health (PHC/APHC)", count: facilities.filter((f) => f.categoryKey === "PHC" || f.type === "PHC" || f.type === "APHC").length },
+    { key: "HSC", label: "Sub-Centres (HSC/HWC)", count: facilities.filter((f) => f.categoryKey === "HSC" || f.type === "HSC" || f.type === "HWC" || f.type === "UHWC").length },
+  ], [facilities]);
 
   // Filter facilities
   const filteredFacilities = useMemo(() => {
-    return FACILITY_METAS.filter((f) => {
+    return facilities.filter((f) => {
       const matchesCategory =
         selectedCategory === "ALL" || f.categoryKey === selectedCategory;
+      const matchesBlock =
+        selectedBlock === "ALL" || f.block?.toLowerCase() === selectedBlock.toLowerCase();
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
-        f.name.toLowerCase().includes(q) ||
-        f.block.toLowerCase().includes(q) ||
-        f.address.toLowerCase().includes(q) ||
-        f.pin.includes(q) ||
-        f.phone.toLowerCase().includes(q) ||
-        f.type.toLowerCase().includes(q);
-      return matchesCategory && matchesSearch;
+        f.name?.toLowerCase().includes(q) ||
+        f.block?.toLowerCase().includes(q) ||
+        f.address?.toLowerCase().includes(q) ||
+        f.pin?.includes(q) ||
+        f.phone?.toLowerCase().includes(q) ||
+        f.type?.toLowerCase().includes(q);
+      return matchesCategory && matchesBlock && matchesSearch;
     });
-  }, [selectedCategory, searchQuery]);
+  }, [facilities, selectedCategory, selectedBlock, searchQuery]);
+
+  const totalPages = Math.ceil(filteredFacilities.length / ITEMS_PER_PAGE) || 1;
+  const paginatedFacilities = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredFacilities.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredFacilities, currentPage]);
+
+  useEffect(() => {
+    if (!loading && cardsGridRef.current && paginatedFacilities.length > 0) {
+      gsap.fromTo(
+        cardsGridRef.current.querySelectorAll(".fac-card"),
+        { y: 16, opacity: 0 },
+        { y: 0, opacity: 1, stagger: 0.03, duration: 0.35, ease: "power2.out" }
+      );
+    }
+  }, [loading, currentPage, selectedCategory, selectedBlock, paginatedFacilities.length]);
 
   // GSAP animations setup
   useEffect(() => {
@@ -626,6 +172,7 @@ export default function FacilitiesPage() {
 
   const handleCategorySelect = (key) => {
     setSelectedCategory(key);
+    setCurrentPage(1);
     // Smooth scroll slightly down to results if at top
     if (cardsGridRef.current && window.scrollY < 280) {
       cardsGridRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -903,7 +450,7 @@ export default function FacilitiesPage() {
               onClick={() => setMobileMenuOpen(false)}
               style={{ padding: "10px 14px", borderRadius: 8, color: "#1e40af", background: "#eff6ff", fontSize: 14, fontWeight: 700, textDecoration: "none" }}
             >
-              🏥 Facility Directory (39 Facilities)
+              🏥 Facility Directory (606 Facilities)
             </Link>
             <Link
               href="/track"
@@ -975,7 +522,7 @@ export default function FacilitiesPage() {
               }}
             >
               <span className="pulse-dot" style={{ width: 8, height: 8, borderRadius: "50%", background: "#16a34a" }} />
-              Civil Registration System (CRS) • Madhubani Healthcare Directory
+              Civil Registration System (CRS) • Madhubani District Healthcare Directory
             </div>
             <h1
               className="anim-fac-title"
@@ -1000,7 +547,7 @@ export default function FacilitiesPage() {
                 lineHeight: 1.6,
               }}
             >
-              Official registry of all 39 designated government institutions in Madhubani District for institutional birth registration under the Civil Registration System (CRS). Includes verified hospital telephone lines, 24x7 ambulance helplines, addresses, and instant online application routing.
+              Official registry of all government healthcare institutions in Madhubani District for institutional birth registration under the Civil Registration System (CRS). Includes verified hospital telephone lines, 24x7 ambulance helplines, addresses, and instant online application.
             </p>
           </div>
 
@@ -1081,7 +628,7 @@ export default function FacilitiesPage() {
                     transition: "transform 0.15s ease",
                   }}
                 >
-                  <span>📞 Civil Surgeon: 9470003434</span>
+                  <span>☎️ Civil Surgeon: 9470003434</span>
                 </a>
               </div>
             </div>
@@ -1118,7 +665,7 @@ export default function FacilitiesPage() {
                 <div style={{ fontSize: 16, fontWeight: 800, color: "#047857", marginTop: 2 }}>
                   <a href="tel:102" style={{ color: "#047857", textDecoration: "none" }}>102 (Toll-Free 24x7)</a>
                 </div>
-                <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 4 }}>Free for Pregnant Mothers & Infants</div>
+                <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 4 }}>For Pregnant Mothers & Infants</div>
               </div>
 
               <div style={{ background: "#ffffff", borderRadius: 12, padding: "14px 16px", border: "1px solid #bfdbfe", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
@@ -1129,7 +676,7 @@ export default function FacilitiesPage() {
                 <div style={{ fontSize: 16, fontWeight: 800, color: "#1d4ed8", marginTop: 2 }}>
                   <a href="tel:104" style={{ color: "#1d4ed8", textDecoration: "none" }}>104 (Medical Guidance)</a>
                 </div>
-                <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 4 }}>Free doctor consultation & health advice</div>
+                <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 4 }}>For doctor consultation & health advice</div>
               </div>
 
               <div style={{ background: "#ffffff", borderRadius: 12, padding: "14px 16px", border: "1px solid #fed7aa", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
@@ -1169,7 +716,7 @@ export default function FacilitiesPage() {
             >
               <div style={{ fontSize: 26, background: "#eff6ff", width: 48, height: 48, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>🏥</div>
               <div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "#1e3a8a", lineHeight: 1.1 }}>39</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: "#1e3a8a", lineHeight: 1.1 }}>606</div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>Total Healthcare Facilities</div>
                 <div style={{ fontSize: 11, color: "#94a3b8" }}>Covering all 21 Blocks of Madhubani</div>
               </div>
@@ -1190,8 +737,8 @@ export default function FacilitiesPage() {
             >
               <div style={{ fontSize: 26, background: "#fef3c7", width: 48, height: 48, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>⭐</div>
               <div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "#92400e", lineHeight: 1.1 }}>1</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>District Apex Hospital</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: "#92400e", lineHeight: 1.1 }}>{facilities.filter((f) => f.categoryKey === "DH" || f.type === "DH").length || 1}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>District Hospital</div>
                 <div style={{ fontSize: 11, color: "#94a3b8" }}>Sadar Hospital Madhubani (24x7 SNCU)</div>
               </div>
             </div>
@@ -1211,9 +758,9 @@ export default function FacilitiesPage() {
             >
               <div style={{ fontSize: 26, background: "#f3e8ff", width: 48, height: 48, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>🏛️</div>
               <div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "#6b21a8", lineHeight: 1.1 }}>4</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: "#6b21a8", lineHeight: 1.1 }}>{facilities.filter((f) => f.categoryKey === "SDH" || f.type === "SDH").length || 4}</div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>Sub-Divisional & Referral</div>
-                <div style={{ fontSize: 11, color: "#94a3b8" }}>Jaynagar, Jhanjharpur, Phulparas, Andhrathari</div>
+                <div style={{ fontSize: 11, color: "#94a3b8" }}>Jaynagar, Jhanjharpur, Phulparas, Benipatti</div>
               </div>
             </div>
 
@@ -1232,9 +779,30 @@ export default function FacilitiesPage() {
             >
               <div style={{ fontSize: 26, background: "#ecfdf5", width: 48, height: 48, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>🏨</div>
               <div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "#065f46", lineHeight: 1.1 }}>34</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: "#065f46", lineHeight: 1.1 }}>{facilities.filter((f) => f.categoryKey === "CHC" || f.categoryKey === "PHC").length || 71}</div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>CHCs & PHCs Network</div>
-                <div style={{ fontSize: 11, color: "#94a3b8" }}>12 CHCs + 22 PHCs / APHCs</div>
+                <div style={{ fontSize: 11, color: "#94a3b8" }}>17 CHCs + 54 PHCs / APHCs</div>
+              </div>
+            </div>
+
+            <div
+              className="anim-fac-stat"
+              style={{
+                background: "white",
+                borderRadius: 14,
+                padding: "16px 20px",
+                border: "1px solid #e2e8f0",
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+                boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+              }}
+            >
+              <div style={{ fontSize: 26, background: "#f0f9ff", width: 48, height: 48, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>🏠</div>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: "#0369a1", lineHeight: 1.1 }}>{facilities.filter((f) => f.categoryKey === "HSC").length || 530}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>HSCs & HWCs Network</div>
+                <div style={{ fontSize: 11, color: "#94a3b8" }}>Health Sub-Centres & Wellness Centres</div>
               </div>
             </div>
           </div>
@@ -1270,73 +838,113 @@ export default function FacilitiesPage() {
                   Filter Facilities & Verified Contact Details
                 </h2>
                 <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>
-                  Search by hospital name, block, PIN code, address, or telephone number.
+                  Search across all healthcare facilities by name, block, PIN code, or address.
                 </p>
               </div>
 
-              {/* Search input */}
-              <div style={{ position: "relative", minWidth: 280, maxWidth: 420, width: "100%" }}>
-                <span
-                  style={{
-                    position: "absolute",
-                    left: 12,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: "#94a3b8",
-                    fontSize: 15,
-                    pointerEvents: "none",
-                  }}
-                >
-                  🔍
-                </span>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search hospital, block, PIN, or phone..."
-                  style={{
-                    width: "100%",
-                    padding: "10px 36px 10px 38px",
-                    fontSize: 13,
-                    borderRadius: 10,
-                    border: "1.5px solid #cbd5e1",
-                    background: "#f8fafc",
-                    color: "#1e293b",
-                    outline: "none",
-                    boxSizing: "border-box",
-                  }}
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
+              {/* Filters Row: Search and Block Select */}
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, width: "100%", maxWidth: 640 }}>
+                {/* Search input */}
+                <div style={{ position: "relative", flex: 1, minWidth: 260 }}>
+                  <span
                     style={{
                       position: "absolute",
-                      right: 10,
+                      left: 12,
                       top: "50%",
                       transform: "translateY(-50%)",
-                      background: "#e2e8f0",
-                      border: "none",
-                      borderRadius: "50%",
-                      width: 20,
-                      height: 20,
-                      fontSize: 11,
-                      color: "#64748b",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
+                      color: "#94a3b8",
+                      fontSize: 15,
+                      pointerEvents: "none",
                     }}
-                    title="Clear search"
                   >
-                    ✕
-                  </button>
-                )}
+                    🔍
+                  </span>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    placeholder="Search hospital, block, PIN, phone, or address..."
+                    style={{
+                      width: "100%",
+                      padding: "10px 36px 10px 38px",
+                      fontSize: 13,
+                      borderRadius: 10,
+                      border: "1.5px solid #cbd5e1",
+                      background: "#f8fafc",
+                      color: "#1e293b",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setCurrentPage(1);
+                      }}
+                      style={{
+                        position: "absolute",
+                        right: 10,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        background: "#e2e8f0",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: 20,
+                        height: 20,
+                        fontSize: 11,
+                        color: "#64748b",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                      title="Clear search"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Block Filter Dropdown */}
+                <div style={{ minWidth: 190 }}>
+                  <select
+                    value={selectedBlock}
+                    onChange={(e) => {
+                      setSelectedBlock(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      fontSize: 13,
+                      borderRadius: 10,
+                      border: "1.5px solid #cbd5e1",
+                      background: "#f8fafc",
+                      color: "#1e293b",
+                      outline: "none",
+                      boxSizing: "border-box",
+                      cursor: "pointer",
+                      fontWeight: 500,
+                    }}
+                  >
+                    <option value="ALL">-- All Blocks Selected --</option>
+                    {allBlocks.map((b) => (
+                      <option key={b} value={b}>
+                        {b} Block
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
             {/* Category Pills */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {CATEGORY_TABS.map((tab) => {
+              {categoryTabs.map((tab) => {
                 const isActive = selectedCategory === tab.key;
                 return (
                   <button
@@ -1386,16 +994,25 @@ export default function FacilitiesPage() {
               fontSize: 13,
               color: "#64748b",
               fontWeight: 500,
+              flexWrap: "wrap",
+              gap: 10,
             }}
           >
             <span>
-              Showing <strong>{filteredFacilities.length}</strong> of <strong>39</strong> registered facilities across Madhubani District
+              Showing <strong>{filteredFacilities.length}</strong> of <strong>{facilities.length}</strong> registered facilities across Madhubani District
+              {filteredFacilities.length > ITEMS_PER_PAGE && (
+                <span style={{ marginLeft: 8, color: "#1e40af", fontWeight: 600 }}>
+                  (Page {currentPage} of {totalPages})
+                </span>
+              )}
             </span>
-            {(selectedCategory !== "ALL" || searchQuery) && (
+            {(selectedCategory !== "ALL" || selectedBlock !== "ALL" || searchQuery) && (
               <button
                 onClick={() => {
                   setSelectedCategory("ALL");
+                  setSelectedBlock("ALL");
                   setSearchQuery("");
+                  setCurrentPage(1);
                 }}
                 style={{
                   background: "none",
@@ -1413,7 +1030,40 @@ export default function FacilitiesPage() {
           </div>
 
           {/* Empty State */}
-          {filteredFacilities.length === 0 ? (
+          {loading ? (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
+                gap: 18,
+              }}
+            >
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <div
+                  key={n}
+                  style={{
+                    background: "#ffffff",
+                    borderRadius: 14,
+                    border: "1px solid #e2e8f0",
+                    padding: "20px 22px",
+                    minHeight: 260,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ width: 140, height: 22, background: "#f1f5f9", borderRadius: 6 }} />
+                    <div style={{ width: 80, height: 20, background: "#f1f5f9", borderRadius: 99 }} />
+                  </div>
+                  <div style={{ width: "70%", height: 20, background: "#f1f5f9", borderRadius: 6 }} />
+                  <div style={{ width: "90%", height: 14, background: "#f1f5f9", borderRadius: 6 }} />
+                  <div style={{ width: "100%", height: 40, background: "#f8fafc", borderRadius: 8, marginTop: 4 }} />
+                  <div style={{ marginTop: "auto", width: "100%", height: 36, background: "#f1f5f9", borderRadius: 8 }} />
+                </div>
+              ))}
+            </div>
+          ) : filteredFacilities.length === 0 ? (
             <div
               style={{
                 padding: "60px 20px",
@@ -1428,12 +1078,14 @@ export default function FacilitiesPage() {
                 No facilities found
               </h3>
               <p style={{ fontSize: 14, color: "#64748b", marginBottom: 20, maxWidth: 440, margin: "0 auto 20px" }}>
-                No healthcare facility matched &ldquo;{searchQuery}&rdquo;. Try another hospital name, block, or PIN code.
+                No healthcare facility matched your filters. Try selecting another block, category, or clearing the search query.
               </p>
               <button
                 onClick={() => {
                   setSelectedCategory("ALL");
+                  setSelectedBlock("ALL");
                   setSearchQuery("");
+                  setCurrentPage(1);
                 }}
                 style={{
                   padding: "9px 20px",
@@ -1446,7 +1098,7 @@ export default function FacilitiesPage() {
                   cursor: "pointer",
                 }}
               >
-                Show All 39 Facilities
+                Show All {facilities.length} Facilities
               </button>
             </div>
           ) : (
@@ -1459,7 +1111,7 @@ export default function FacilitiesPage() {
                 gap: 18,
               }}
             >
-              {filteredFacilities.map((f) => (
+              {paginatedFacilities.map((f) => (
                 <div
                   key={f.name}
                   className="fac-card"
@@ -1534,11 +1186,12 @@ export default function FacilitiesPage() {
                         fontWeight: 700,
                         color: "#0f172a",
                         lineHeight: 1.4,
-                        marginBottom: 12,
+                        marginBottom: 10,
                       }}
                     >
                       {f.name}
                     </h3>
+
 
                     {/* Location & Block Info */}
                     <div
@@ -1682,6 +1335,110 @@ export default function FacilitiesPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                marginTop: 28,
+                padding: "16px 20px",
+                background: "#ffffff",
+                borderRadius: 14,
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+              }}
+            >
+              <button
+                onClick={() => {
+                  setCurrentPage(1);
+                  if (cardsGridRef.current) cardsGridRef.current.scrollIntoView({ behavior: "smooth" });
+                }}
+                disabled={currentPage === 1}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: currentPage === 1 ? "#f8fafc" : "#ffffff",
+                  color: currentPage === 1 ? "#94a3b8" : "#1e293b",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                }}
+              >
+                « First
+              </button>
+              <button
+                onClick={() => {
+                  setCurrentPage((prev) => Math.max(1, prev - 1));
+                  if (cardsGridRef.current) cardsGridRef.current.scrollIntoView({ behavior: "smooth" });
+                }}
+                disabled={currentPage === 1}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: currentPage === 1 ? "#f8fafc" : "#ffffff",
+                  color: currentPage === 1 ? "#94a3b8" : "#1e293b",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                }}
+              >
+                ‹ Prev
+              </button>
+
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#334155", padding: "0 12px" }}>
+                Page <span style={{ color: "#1e40af", fontWeight: 700 }}>{currentPage}</span> of <span>{totalPages}</span>
+                <span style={{ color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>
+                  ({filteredFacilities.length} facilities)
+                </span>
+              </div>
+
+              <button
+                onClick={() => {
+                  setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+                  if (cardsGridRef.current) cardsGridRef.current.scrollIntoView({ behavior: "smooth" });
+                }}
+                disabled={currentPage === totalPages}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: currentPage === totalPages ? "#f8fafc" : "#ffffff",
+                  color: currentPage === totalPages ? "#94a3b8" : "#1e293b",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                }}
+              >
+                Next ›
+              </button>
+              <button
+                onClick={() => {
+                  setCurrentPage(totalPages);
+                  if (cardsGridRef.current) cardsGridRef.current.scrollIntoView({ behavior: "smooth" });
+                }}
+                disabled={currentPage === totalPages}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: currentPage === totalPages ? "#f8fafc" : "#ffffff",
+                  color: currentPage === totalPages ? "#94a3b8" : "#1e293b",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                }}
+              >
+                Last »
+              </button>
             </div>
           )}
 

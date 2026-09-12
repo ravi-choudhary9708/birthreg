@@ -12,46 +12,34 @@ All generated staff accounts use the following default password:
 ### Operator Account (Centralized)
 - **Username:** `operator_central`
 
-### Verifier Accounts (Per Facility - 39 Facilities)
-- **REFERRAL HOSPITAL ANDHRATHARI:** `verifier_rh_andhrathari`
-- **PHC ANDHRATHADHI:** `verifier_phc_andhrathadhi`
+### Verifier Accounts (Per Facility - 606 Facilities across 21 Blocks)
+
+Every one of the **606 authorized government healthcare facilities** in Madhubani District has a designated verifier account with the default password `Madhubani@2024`.
+
+All verifier usernames follow the convention `verifier_<facility_slug>`. Verifier accounts and credentials are administered internally via the **Operator Central Dashboard**.
+
+#### Key District & Sub-Divisional Facility Credentials:
+- **District Hospital Madhubani (District Hospital):** `verifier_district_hospital`
+- **SDH Benipatti Madhubani:** `verifier_sdh_benipatti`
+- **SDH Jaynagar Madhubani:** `verifier_sdh_jaynagar`
+- **SDH Jhanjharpur Madhubani:** `verifier_sdh_jhanjharpur`
+- **SDH Phulparas Madhubani:** `verifier_sdh_phulparas`
+
+#### Sample CHC, PHC, & HWC Credentials:
+- **CHC ANDHRATHARI:** `verifier_chc_andhrathari`
 - **PHC BABUBARHI:** `verifier_phc_babubarhi`
 - **CHC BABUBARHI:** `verifier_chc_babubarhi`
-- **PRIMARY HEALTH CENTRE BASOPATTI:** `verifier_phc_basopatti`
-- **PHC BENIPATTI MADHUBANI:** `verifier_phc_benipatti`
-- **PRIMARI HEALTH CENTRE BISFI:** `verifier_phc_bisfi`
+- **PRIMARY HEALTH CENTRE BASOPATTI:** `verifier_primary_health_centre_basopatti`
 - **CHC BISFI:** `verifier_chc_bisfi`
 - **PHC GHOGHARDIHA:** `verifier_phc_ghoghardiha`
-- **PHC HARLAKHI:** `verifier_phc_harlakhi`
 - **CHC HARLAKHI:** `verifier_chc_harlakhi`
-- **SUB DIVISIONAL HOSPITAL, JAYNAGAR:** `verifier_sdh_jaynagar`
-- **PRIMARY HEALTH CENTRE JAYNAGAR:** `verifier_phc_jaynagar`
-- **SUPRITENDENT SUB DIVISIONAL HOSPITAL JHANJHARPUR:** `verifier_sdh_jhanjharpur`
-- **PRIMARY HEALTH CENTRE JHANJHARPUR:** `verifier_phc_jhanjharpur`
-- **PHC KALUAHI:** `verifier_phc_kaluahi`
-- **CHC KALUAHI:** `verifier_chc_kaluahi`
-- **PRIMARY HEALTH CENTRE KHAJAULI:** `verifier_phc_khajauli`
 - **CHC KHAJAULI:** `verifier_chc_khajauli`
-- **PHC KHUTAUNA:** `verifier_phc_khutauna`
-- **CHC KHUTAUNA:** `verifier_chc_khutauna`
-- **PRIMARY HEALTH CENTRE LADANIA:** `verifier_phc_ladania`
 - **CHC LADANIA:** `verifier_chc_ladania`
-- **PRIMARY HEALTH CENTRE LAKHNAUR:** `verifier_phc_lakhnaur`
 - **CHC LAKHNAUR:** `verifier_chc_lakhnaur`
-- **PHC LAUKAHI MADHUBANI:** `verifier_phc_laukahi`
-- **CHC LAUKAHI:** `verifier_chc_laukahi`
-- **PRIMARY HEALTH CENTRE MADHEPUR:** `verifier_phc_madhepur`
-- **SADAR HOSPITAL MADHUBANI:** `verifier_sadar`
-- **PRIMARY HEALTH CENTRE MADHWAPUR:** `verifier_phc_madhwapur`
-- **CHC MADHWAPUR:** `verifier_chc_madhwapur`
-- **APHC MAHRAIL:** `verifier_aphc_mahrail`
-- **PRIMARY HEALTH CENTRE PANDAUL:** `verifier_phc_pandaul`
-- **SUPRITENDENT SUB DIVISIONAL HOSPITAL PHULPARAS:** `verifier_sdh_phulparas`
-- **PRIMARY HEALTH CENTRE PHULPARAS:** `verifier_phc_phulparas`
-- **PRIMARY HEALTH CENTER RAHIKA:** `verifier_phc_rahika`
+- **PRIMARY HEALTH CENTRE PANDAUL:** `verifier_primary_health_centre_pandaul`
 - **CHC RAHIKA:** `verifier_chc_rahika`
-- **PRIMARY HEALTH CENTRE RAJNAGAR:** `verifier_phc_rajnagar`
 - **CHC RAJNAGAR:** `verifier_chc_rajnagar`
+- *(To look up any other facility's exact login ID among the 606, search the `/facilities` directory or Operator Dashboard)*
 
 ## Environment Setup
 Make sure to configure `.env.local` before starting the application:

@@ -36,9 +36,13 @@ export async function GET(request) {
         const SLA_DAYS = 7;
         const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
-        // Initialize map for all 39 facilities
+        // Fetch all facilities from database
+        const dbFacilities = await prisma.facility.findMany({ select: { name: true } });
+        const allFacilityNames = dbFacilities && dbFacilities.length > 0 ? dbFacilities.map((f) => f.name) : FACILITIES;
+
+        // Initialize map for facilities
         const facilityStatsMap = {};
-        for (const fac of FACILITIES) {
+        for (const fac of allFacilityNames) {
             facilityStatsMap[fac.toUpperCase()] = {
                 facility: fac,
                 totalReceived: 0,

@@ -37,12 +37,25 @@ import {
   Globe,
   Upload,
   Eye,
+  ExternalLink,
   Download,
   UserCheck,
   ShieldCheck,
   FileCheck,
+  UserPlus,
+  KeyRound,
+  Check,
+  X,
+  Phone,
+  Mail,
+  User,
+  Power,
+  Lock,
+  Users,
 } from "lucide-react";
-import { FACILITIES } from "@/utils/constants";
+import { FACILITIES, FACILITIES_BY_BLOCK } from "@/utils/constants";
+import { getDocumentViewUrl } from "@/utils/documentViewer";
+import { useRefreshSecurity } from "@/hooks/useRefreshSecurity";
 
 const STATUS_LABELS = {
   PENDING_VERIFIER: { label: "Pending Verification", color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
@@ -78,6 +91,7 @@ const HospitalNetwork3D = dynamic(() => import("@/components/HospitalNetwork3D")
 });
 
 export default function OperatorDashboard() {
+  const { isRefreshing } = useRefreshSecurity();
   const [activeTab, setActiveTab] = useState("analytics"); // "analytics" | "queue"
   const [apps, setApps] = useState([]);
   const [stats, setStats] = useState(null);
@@ -102,6 +116,35 @@ export default function OperatorDashboard() {
   const [auditSearchTerm, setAuditSearchTerm] = useState("");
   const [isMounted, setIsMounted] = useState(false);
 
+  // Verifier management state
+  const [verifiers, setVerifiers] = useState([]);
+  const [verifiersLoading, setVerifiersLoading] = useState(false);
+  const [verifiersError, setVerifiersError] = useState("");
+  const [verifierSearch, setVerifierSearch] = useState("");
+  const [verifierStatusFilter, setVerifierStatusFilter] = useState("ALL"); // ALL | ACTIVE | INACTIVE
+  const [verifierPage, setVerifierPage] = useState(1);
+  const [showNewVerifierModal, setShowNewVerifierModal] = useState(false);
+  const [newVerifierForm, setNewVerifierForm] = useState({
+    username: "",
+    password: "",
+    facility: "",
+    authorityName: "",
+    designation: "Facility Verification Officer / MOIC",
+    contactNumber: "",
+    email: "",
+  });
+  const [newVerifierLoading, setNewVerifierLoading] = useState(false);
+  const [newVerifierError, setNewVerifierError] = useState("");
+  const [newVerifierSuccess, setNewVerifierSuccess] = useState("");
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(null);
+  const [resetPasswordVal, setResetPasswordVal] = useState("");
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  const [resetPasswordError, setResetPasswordError] = useState("");
+  const [toggleLoadingId, setToggleLoadingId] = useState(null);
+  const [confirmToggleModal, setConfirmToggleModal] = useState(null);
+  const [facilitiesByBlock, setFacilitiesByBlock] = useState(FACILITIES_BY_BLOCK);
+  const [totalFacilitiesCount, setTotalFacilitiesCount] = useState(FACILITIES.length);
+
   const router = useRouter();
   const containerRef = useRef(null);
 
@@ -112,7 +155,15 @@ export default function OperatorDashboard() {
 
   // Lock background body scroll when any modal is open
   useEffect(() => {
-    if (viewingApp || auditingFacility || showRejectModal || showUploadModal) {
+    if (
+      viewingApp ||
+      auditingFacility ||
+      showRejectModal ||
+      showUploadModal ||
+      showNewVerifierModal ||
+      showResetPasswordModal ||
+      confirmToggleModal
+    ) {
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       if (typeof window !== "undefined" && window.__lenis) {
@@ -125,28 +176,70 @@ export default function OperatorDashboard() {
         }
       };
     }
-  }, [viewingApp, auditingFacility, showRejectModal, showUploadModal]);
+  }, [
+    viewingApp,
+    auditingFacility,
+    showRejectModal,
+    showUploadModal,
+    showNewVerifierModal,
+    showResetPasswordModal,
+    confirmToggleModal,
+  ]);
 
-  // GSAP Entrance Animations
+  // Entrance animations for stats counter
   useEffect(() => {
     if (!loading && containerRef.current) {
       const ctx = gsap.context(() => {
-        if (containerRef.current.querySelector(".anim-op-header")) {
-          gsap.from(".anim-op-header", {
-            y: -15,
+        const safeFrom = (selector, vars) => {
+          const els = containerRef.current?.querySelectorAll(selector);
+          if (els && els.length > 0) {
+            gsap.from(els, vars);
+          }
+        };
+
+        if (activeTab === "analytics") {
+          safeFrom(".anim-op-header", {
+            y: -10,
             opacity: 0,
-            duration: 0.5,
+            duration: 0.4,
             ease: "power2.out",
           });
-        }
-        if (containerRef.current.querySelectorAll(".anim-op-stat").length > 0) {
-          gsap.from(".anim-op-stat", {
-            scale: 0.94,
-            opacity: 0,
+          safeFrom(".anim-op-hero", {
             y: 12,
+            opacity: 0,
+            duration: 0.5,
+            delay: 0.1,
+            ease: "power3.out",
+          });
+          safeFrom(".anim-op-stat", {
+            y: 15,
+            opacity: 0,
+            duration: 0.45,
             stagger: 0.08,
+            delay: 0.15,
+            ease: "power3.out",
+          });
+          safeFrom(".anim-op-grid-widget", {
+            scale: 0.98,
+            opacity: 0,
+            duration: 0.5,
+            stagger: 0.1,
+            delay: 0.25,
+            ease: "power2.out",
+          });
+        } else if (activeTab === "queue") {
+          safeFrom(".anim-op-queue-card", {
+            y: 10,
+            opacity: 0,
             duration: 0.45,
             ease: "back.out(1.4)",
+          });
+        } else if (activeTab === "verifiers") {
+          safeFrom(".anim-op-verifier-card", {
+            y: 10,
+            opacity: 0,
+            duration: 0.45,
+            ease: "power2.out",
           });
         }
       }, containerRef);
@@ -159,7 +252,7 @@ export default function OperatorDashboard() {
     try {
       const res = await fetch("/api/admin/applications");
       const data = await res.json();
-      if (res.status === 401) { router.push("/login"); return; }
+      if (res.status === 401) { router.push("/logout?reason=refresh"); return; }
       if (!data.success) throw new Error(data.message);
       const list = Array.isArray(data.data) ? data.data : (data.data?.applications || []);
       setApps(list);
@@ -176,7 +269,7 @@ export default function OperatorDashboard() {
     try {
       const res = await fetch("/api/admin/statistics");
       const data = await res.json();
-      if (res.status === 401) { router.push("/login"); return; }
+      if (res.status === 401) { router.push("/logout?reason=refresh"); return; }
       if (!data.success) throw new Error(data.message);
       setStats(data.data);
     } catch (err) {
@@ -186,11 +279,166 @@ export default function OperatorDashboard() {
     }
   }, [router]);
 
+  // Fetch verifiers list
+  // Fetch verifiers list with auto-retry on serverless cold-start
+  const fetchVerifiers = useCallback(async (isRetry = false) => {
+    setVerifiersLoading(true);
+    setVerifiersError("");
+    try {
+      const res = await fetch("/api/admin/verifiers");
+      const data = await res.json();
+      if (res.status === 401) { router.push("/logout?reason=refresh"); return; }
+      if (!data.success) throw new Error(data.message);
+      setVerifiers(data.data || []);
+      setVerifiersError("");
+      setVerifiersLoading(false);
+    } catch (err) {
+      if (!isRetry) {
+        // Automatic single retry in case of database cold start
+        setTimeout(() => fetchVerifiers(true), 1200);
+        return;
+      }
+      setVerifiersError(err.message || "Failed to load verifiers");
+      setVerifiersLoading(false);
+    }
+  }, [router]);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchApps();
     fetchStats();
-  }, [fetchApps, fetchStats]);
+    fetchVerifiers();
+    fetch("/api/facilities")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data?.facilities?.length > 0) {
+          const grouped = data.data.facilities.reduce((acc, f) => {
+            const b = f.block || "Other";
+            if (!acc[b]) acc[b] = [];
+            acc[b].push(f.name);
+            return acc;
+          }, {});
+          setFacilitiesByBlock(grouped);
+          setTotalFacilitiesCount(data.data.facilities.length);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load facilities from database in operator dashboard:", err);
+      });
+  }, [fetchApps, fetchStats, fetchVerifiers]);
+
+  // Re-fetch verifiers if empty when switching to verifiers tab
+  useEffect(() => {
+    if (activeTab === "verifiers" && verifiers.length === 0 && !verifiersLoading) {
+      fetchVerifiers();
+    }
+  }, [activeTab, verifiers.length, verifiersLoading, fetchVerifiers]);
+
+  const handleCreateVerifier = async (e) => {
+    e.preventDefault();
+    setNewVerifierLoading(true);
+    setNewVerifierError("");
+    setNewVerifierSuccess("");
+    try {
+      const res = await fetch("/api/admin/verifiers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newVerifierForm),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setNewVerifierSuccess(`सत्यापनकर्ता '${data.data.username}' सफलतापूर्वक पंजीकृत हो गया!`);
+      await fetchVerifiers();
+      setTimeout(() => {
+        setShowNewVerifierModal(false);
+        setNewVerifierForm({
+          username: "",
+          password: "",
+          facility: "",
+          authorityName: "",
+          designation: "Facility Verification Officer / MOIC",
+          contactNumber: "",
+          email: "",
+        });
+        setNewVerifierSuccess("");
+      }, 1200);
+    } catch (err) {
+      setNewVerifierError(err.message);
+    } finally {
+      setNewVerifierLoading(false);
+    }
+  };
+
+  const handleToggleVerifierStatus = async (verifier) => {
+    if (!verifier) return;
+    setToggleLoadingId(verifier.id);
+    try {
+      const newStatus = !verifier.isActive;
+      const res = await fetch(`/api/admin/verifiers/${verifier.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: newStatus }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setVerifiers((prev) =>
+        prev.map((v) => (v.id === verifier.id ? { ...v, isActive: newStatus } : v))
+      );
+      setConfirmToggleModal(null);
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      setToggleLoadingId(null);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (!showResetPasswordModal || !resetPasswordVal.trim()) return;
+    setResetPasswordLoading(true);
+    setResetPasswordError("");
+    try {
+      const res = await fetch(`/api/admin/verifiers/${showResetPasswordModal.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: resetPasswordVal.trim() }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      alert(`सत्यापनकर्ता '${showResetPasswordModal.username}' का पासवर्ड सफलतापूर्वक अद्यतन कर दिया गया।`);
+      setShowResetPasswordModal(null);
+      setResetPasswordVal("");
+    } catch (err) {
+      setResetPasswordError(err.message);
+    } finally {
+      setResetPasswordLoading(false);
+    }
+  };
+
+  const filteredVerifiers = useMemo(() => {
+    return verifiers.filter((v) => {
+      if (verifierStatusFilter === "ACTIVE" && !v.isActive) return false;
+      if (verifierStatusFilter === "INACTIVE" && v.isActive) return false;
+      if (verifierSearch.trim()) {
+        const term = verifierSearch.toLowerCase();
+        const u = (v.username || "").toLowerCase();
+        const f = (v.facility || "").toLowerCase();
+        const a = (v.authorityName || "").toLowerCase();
+        const d = (v.designation || "").toLowerCase();
+        const e = (v.email || "").toLowerCase();
+        const c = (v.contactNumber || "").toLowerCase();
+        return u.includes(term) || f.includes(term) || a.includes(term) || d.includes(term) || e.includes(term) || c.includes(term);
+      }
+      return true;
+    });
+  }, [verifiers, verifierStatusFilter, verifierSearch]);
+
+  const VERIFIERS_PER_PAGE = 30;
+  const verifierTotalPages = Math.ceil(filteredVerifiers.length / VERIFIERS_PER_PAGE) || 1;
+  const paginatedVerifiers = useMemo(() => {
+    const start = (verifierPage - 1) * VERIFIERS_PER_PAGE;
+    return filteredVerifiers.slice(start, start + VERIFIERS_PER_PAGE);
+  }, [filteredVerifiers, verifierPage]);
 
   const handleApplyCRS = async (id) => {
     setActionLoading(id);
@@ -258,8 +506,12 @@ export default function OperatorDashboard() {
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+    router.push("/logout?reason=manual");
   };
 
   const pending = apps.filter(a => a.status === "PENDING_OPERATOR").length;
@@ -322,6 +574,42 @@ export default function OperatorDashboard() {
         Overdue: f.overdueVerifier,
       }));
   }, [stats]);
+  if (isRefreshing) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f9fafb",
+          color: "#111827",
+          fontFamily: "'Inter', sans-serif",
+          padding: 20,
+          textAlign: "center",
+        }}
+      >
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            border: "3.5px solid #e5e7eb",
+            borderTopColor: "#1e40af",
+            borderRadius: "50%",
+            animation: "spin 0.8s linear infinite",
+            marginBottom: 16,
+          }}
+        />
+        <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "#111827" }}>
+          सुरक्षा नीति: सत्र समाप्त हो रहा है...
+        </h3>
+        <p style={{ fontSize: 13, color: "#6b7280", margin: "8px 0 0" }}>
+          पृष्ठ रीफ़्रेश करने के कारण लॉग आउट किया जा रहा है (Logging out due to page refresh...)
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} style={{ minHeight: "100vh", background: "#f8fafc" }}>
@@ -440,6 +728,34 @@ export default function OperatorDashboard() {
               {pending}
             </span>
           </button>
+
+          <button
+            onClick={() => setActiveTab("verifiers")}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "14px 4px", fontSize: 14, fontWeight: 700,
+              color: activeTab === "verifiers" ? "#7c3aed" : "#64748b",
+              borderBottom: activeTab === "verifiers" ? "3px solid #7c3aed" : "3px solid transparent",
+              background: "none", borderLeft: "none", borderRight: "none", borderTop: "none",
+              cursor: "pointer", transition: "all 0.2s ease",
+            }}>
+            <UserCheck size={18} />
+            Verifier Management (सत्यापनकर्ता नियंत्रण)
+            <span style={{
+              background: "#dbeafe", color: "#1e40af", fontSize: 11, fontWeight: 700,
+              padding: "1px 7px", borderRadius: 10,
+            }}>
+              {verifiers.length}
+            </span>
+            {verifiers.some((v) => !v.isActive) && (
+              <span style={{
+                background: "#fef2f2", color: "#dc2626", fontSize: 10.5, fontWeight: 800,
+                padding: "1px 6px", borderRadius: 10, border: "1px solid #fecaca",
+              }}>
+                {verifiers.filter((v) => !v.isActive).length} Inactive
+              </span>
+            )}
+          </button>
         </div>
       </header>
 
@@ -468,7 +784,7 @@ export default function OperatorDashboard() {
                 Hospital Verification Compliance Dashboard
               </h1>
               <p style={{ color: "#64748b", fontSize: 14, margin: 0 }}>
-                Real-time performance audit of all 39 primary health centers (PHC), community health centers (CHC), and sub-divisional hospitals in Madhubani District.
+                Real-time performance audit of all 606 healthcare facilities across Madhubani District.
               </p>
             </div>
 
@@ -504,7 +820,7 @@ export default function OperatorDashboard() {
                 <CheckCircle2 size={24} color="#16a34a" style={{ flexShrink: 0 }} />
                 <div>
                   <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#166534" }}>
-                    All 39 Facilities Fully Compliant (100% On-Track)
+                    All {stats?.facilities?.length ?? 606} Facilities Fully Compliant (100% On-Track)
                   </h4>
                   <p style={{ margin: "2px 0 0", fontSize: 13, color: "#15803d" }}>
                     Zero applications are pending beyond the 7-day statutory limit across Madhubani District.
@@ -578,10 +894,10 @@ export default function OperatorDashboard() {
                   <Building2 size={18} color="#8b5cf6" />
                 </div>
                 <p style={{ fontSize: 30, fontWeight: 800, color: "#7c3aed", margin: "8px 0 2px" }}>
-                  {statsLoading ? "..." : "39"}
+                  {statsLoading ? "..." : (stats?.facilities?.length ?? 606)}
                 </p>
                 <span style={{ fontSize: 12, color: "#64748b" }}>
-                  {stats?.summary?.hospitalsCompliant ?? 39} Compliant • {stats?.summary?.hospitalsWithBacklog ?? 0} Delayed
+                  {stats?.summary?.hospitalsCompliant ?? (stats?.facilities?.length ?? 606)} Compliant • {stats?.summary?.hospitalsWithBacklog ?? 0} Delayed
                 </span>
               </div>
             </div>
@@ -733,10 +1049,10 @@ export default function OperatorDashboard() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14 }}>
                   <div>
                     <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
-                      <Building2 size={20} color="#7c3aed" /> All 39 Government Health Facilities Audit
+                      <Building2 size={20} color="#7c3aed" /> All {stats?.facilities?.length ?? 606} Government Health Facilities Audit
                     </h2>
                     <p style={{ fontSize: 13, color: "#64748b", margin: "3px 0 0" }}>
-                      Monitor verification adherence under the 7-day statutory period for every PHC, CHC, and Referral Hospital.
+                      Monitor verification adherence under the 7-day statutory period for every hospital, CHC, PHC, and health wellness centre.
                     </p>
                   </div>
 
@@ -761,7 +1077,7 @@ export default function OperatorDashboard() {
                 {/* Filter Pills */}
                 <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
                   {[
-                    { id: "ALL", label: `All Facilities (${stats?.facilities?.length ?? 39})` },
+                    { id: "ALL", label: `All Facilities (${stats?.facilities?.length ?? 606})` },
                     { id: "OVERDUE", label: `🚨 SLA Overdue (${stats?.facilities?.filter(f => f.overdueVerifier > 0).length ?? 0})` },
                     { id: "PENDING", label: `⏳ With Active Pending (${stats?.facilities?.filter(f => f.pendingVerifier > 0).length ?? 0})` },
                     { id: "COMPLIANT", label: `✅ 100% Compliant (${stats?.facilities?.filter(f => f.overdueVerifier === 0 && f.totalReceived > 0).length ?? 0})` },
@@ -978,7 +1294,7 @@ export default function OperatorDashboard() {
             }}>
               <Building2 size={24} color="#2563eb" style={{ flexShrink: 0 }} />
               <div style={{ fontSize: 13, color: "#1e40af", lineHeight: 1.5 }}>
-                <strong>Decentralized Facility Pipeline:</strong> All 39 primary health centers and referral hospitals process their applications locally. Central Operator audits SLA adherence, monitors verification timeliness, inspects verifier rejection reasons, and tracks certificate issuance.
+                <strong>Decentralized Facility Pipeline:</strong> All 606 primary health centers, community health centers, wellness centers, and referral hospitals process their applications locally. Central Operator audits SLA adherence, monitors verification timeliness, inspects verifier rejection reasons, and tracks certificate issuance.
               </div>
             </div>
 
@@ -997,11 +1313,18 @@ export default function OperatorDashboard() {
                   style={{
                     padding: "7px 12px", borderRadius: 8, border: "1px solid #cbd5e1",
                     fontSize: 13, color: "#0f172a", outline: "none", background: "white",
-                    maxWidth: 280,
+                    maxWidth: 300,
                   }}>
-                  <option value="ALL">All 39 Health Facilities</option>
-                  {FACILITIES.map(fac => (
-                    <option key={fac} value={fac}>{fac}</option>
+                  <option value="ALL">All Health Facilities ({totalFacilitiesCount} Total)</option>
+                  {Object.entries(facilitiesByBlock).map(([block, facList]) => (
+                    <optgroup key={block} label={`📍 ${block} Block (${facList.length})`}>
+                      {facList.map((fac) => {
+                        const facName = typeof fac === "string" ? fac : fac?.name;
+                        return (
+                          <option key={facName} value={facName}>{facName}</option>
+                        );
+                      })}
+                    </optgroup>
                   ))}
                 </select>
               </div>
@@ -1092,7 +1415,30 @@ export default function OperatorDashboard() {
                               <div style={{ fontSize: 11, color: "#64748b" }}>{app.child?.gender}</div>
                             </td>
                             <td style={{ padding: "14px 16px", fontSize: 13, color: "#334151", verticalAlign: "middle" }}>
-                              {app.informationProvider?.name || app.parents?.mother?.name || "—"}
+                              <div>{app.informationProvider?.name || app.parents?.mother?.name || "—"}</div>
+                              {Boolean(
+                                app.parents?.mother?.adharCardUrl ||
+                                app.parents?.father?.adharCardUrl ||
+                                app.informationProvider?.adharCardUrl ||
+                                app.child?.adharCardUrl
+                              ) && (
+                                <div style={{ marginTop: 3 }}>
+                                  <span style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 3,
+                                    fontSize: 10.5,
+                                    fontWeight: 600,
+                                    background: "#eff6ff",
+                                    color: "#1d4ed8",
+                                    padding: "2px 6px",
+                                    borderRadius: 4,
+                                    border: "1px solid #bfdbfe",
+                                  }}>
+                                    <FileText size={11} /> Aadhaar Attached
+                                  </span>
+                                </div>
+                              )}
                             </td>
                             <td style={{ padding: "14px 16px", verticalAlign: "middle" }}>
                               <span style={{
@@ -1149,6 +1495,696 @@ export default function OperatorDashboard() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* TAB 3: VERIFIER ACCOUNTS & CREDENTIALS CONTROL */}
+        {activeTab === "verifiers" && (
+          <div>
+            {/* Header & New Verifier CTA */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                flexWrap: "wrap",
+                gap: 16,
+                marginBottom: 20,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "3px 10px",
+                    background: "#eff6ff",
+                    border: "1px solid #bfdbfe",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#1e40af",
+                    marginBottom: 8,
+                  }}
+                >
+                  <ShieldCheck size={14} /> District Administration • Verifier Credential & Jurisdiction Authority
+                </div>
+                <h1
+                  style={{
+                    fontSize: "clamp(22px, 3vw, 26px)",
+                    fontWeight: 800,
+                    color: "#0f172a",
+                    margin: "0 0 6px",
+                  }}
+                >
+                  Hospital Verifier Accounts & Access Control (सत्यापनकर्ता प्रबंधन)
+                </h1>
+                <p style={{ color: "#64748b", fontSize: 14, margin: 0, maxWidth: 840, lineHeight: 1.5 }}>
+                  Manage hospital verifier login credentials, monitor real-time operational status, and configure facility-level registration rights. Deactivating a verifier account immediately disables their login and halts new application submissions for that hospital.
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setNewVerifierError("");
+                  setNewVerifierSuccess("");
+                  setShowNewVerifierModal(true);
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "11px 20px",
+                  background: "#1e40af",
+                  color: "white",
+                  borderRadius: 10,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  border: "none",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(30, 64, 175, 0.25)",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <UserPlus size={17} /> + Register New Verifier (नया सत्यापनकर्ता जोड़ें)
+              </button>
+            </div>
+
+            {/* KPI Summary Cards */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 14,
+                marginBottom: 24,
+              }}
+            >
+              <div
+                style={{
+                  background: "white",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 14,
+                  padding: "16px 20px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, color: "#64748b", fontWeight: 600 }}>Total Verifier Accounts</span>
+                  <Users size={20} color="#6366f1" />
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: "#0f172a", marginTop: 6 }}>
+                  {verifiers.length}
+                </div>
+                <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 4 }}>
+                  Registered hospital verification officers
+                </div>
+              </div>
+
+              <div
+                style={{
+                  background: "white",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: 14,
+                  padding: "16px 20px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, color: "#166534", fontWeight: 600 }}>Active Verifiers (सक्रिय)</span>
+                  <CheckCircle2 size={20} color="#16a34a" />
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: "#16a34a", marginTop: 6 }}>
+                  {verifiers.filter((v) => v.isActive).length}
+                </div>
+                <div style={{ fontSize: 11.5, color: "#15803d", marginTop: 4 }}>
+                  Login permitted • Accepting new applications
+                </div>
+              </div>
+
+              <div
+                style={{
+                  background: "white",
+                  border: "1px solid #fecaca",
+                  borderRadius: 14,
+                  padding: "16px 20px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, color: "#991b1b", fontWeight: 600 }}>Deactivated / Suspended</span>
+                  <AlertTriangle size={20} color="#dc2626" />
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: "#dc2626", marginTop: 6 }}>
+                  {verifiers.filter((v) => !v.isActive).length}
+                </div>
+                <div style={{ fontSize: 11.5, color: "#b91c1c", marginTop: 4 }}>
+                  Login blocked • Hospital applications halted
+                </div>
+              </div>
+
+              <div
+                style={{
+                  background: "white",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 14,
+                  padding: "16px 20px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, color: "#64748b", fontWeight: 600 }}>Healthcare Facilities Covered</span>
+                  <Building2 size={20} color="#7c3aed" />
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: "#7c3aed", marginTop: 6 }}>
+                  {new Set(verifiers.map((v) => v.facility)).size} / {totalFacilitiesCount}
+                </div>
+                <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 4 }}>
+                  District Sadar, SDH, CHC, and PHC centres
+                </div>
+              </div>
+            </div>
+
+            {/* Verifiers Filter and Search Bar */}
+            <div
+              style={{
+                background: "white",
+                border: "1px solid #e2e8f0",
+                borderRadius: 14,
+                padding: "14px 18px",
+                marginBottom: 20,
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 12,
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "1 1 300px" }}>
+                <Search size={16} color="#94a3b8" />
+                <input
+                  type="text"
+                  placeholder="Search by username, officer name, hospital, designation, or email..."
+                  value={verifierSearch}
+                  onChange={(e) => {
+                    setVerifierSearch(e.target.value);
+                    setVerifierPage(1);
+                  }}
+                  style={{
+                    width: "100%",
+                    border: "none",
+                    outline: "none",
+                    fontSize: 13.5,
+                    color: "#0f172a",
+                  }}
+                />
+                {verifierSearch && (
+                  <button
+                    onClick={() => {
+                      setVerifierSearch("");
+                      setVerifierPage(1);
+                    }}
+                    style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 16 }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "#64748b" }}>Status Filter:</span>
+                {[
+                  { label: "All Verifiers", val: "ALL" },
+                  { label: `Active (${verifiers.filter((v) => v.isActive).length})`, val: "ACTIVE" },
+                  { label: `Inactive (${verifiers.filter((v) => !v.isActive).length})`, val: "INACTIVE" },
+                ].map((tab) => (
+                  <button
+                    key={tab.val}
+                    onClick={() => {
+                      setVerifierStatusFilter(tab.val);
+                      setVerifierPage(1);
+                    }}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: 8,
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      border: "1px solid",
+                      cursor: "pointer",
+                      background: verifierStatusFilter === tab.val ? "#1e40af" : "#f8fafc",
+                      borderColor: verifierStatusFilter === tab.val ? "#1e40af" : "#cbd5e1",
+                      color: verifierStatusFilter === tab.val ? "white" : "#475569",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Error Message if any */}
+            {verifiersError && (
+              <div
+                style={{
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: 10,
+                  padding: "12px 16px",
+                  color: "#dc2626",
+                  fontSize: 13,
+                  marginBottom: 20,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <AlertTriangle size={18} /> {verifiersError}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fetchVerifiers()}
+                  style={{
+                    background: "#dc2626",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 6,
+                    padding: "6px 14px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <RefreshCw size={13} /> पुन: लोड करें (Retry)
+                </button>
+              </div>
+            )}
+
+            {/* Verifiers Table */}
+            <div
+              style={{
+                background: "white",
+                border: "1px solid #e2e8f0",
+                borderRadius: 16,
+                overflow: "hidden",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.02)",
+              }}
+            >
+              {verifiersLoading ? (
+                <div style={{ padding: 48, textAlign: "center", color: "#64748b" }}>
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      border: "3px solid #e2e8f0",
+                      borderTopColor: "#1e40af",
+                      borderRadius: "50%",
+                      animation: "spin 0.8s linear infinite",
+                      margin: "0 auto 12px",
+                    }}
+                  />
+                  सत्यापनकर्ता सूची लोड हो रही है... (Loading verifiers...)
+                </div>
+              ) : filteredVerifiers.length === 0 ? (
+                <div style={{ padding: 48, textAlign: "center", color: "#64748b" }}>
+                  <UserCheck size={36} color="#cbd5e1" style={{ margin: "0 auto 12px" }} />
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1e293b", margin: "0 0 6px" }}>
+                    कोई सत्यापनकर्ता नहीं मिला (No Verifiers Found)
+                  </h3>
+                  <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>
+                    खोज मानदंड या फ़िल्टर समायोजित करें, अथवा नया सत्यापनकर्ता पंजीकृत करें।
+                  </p>
+                </div>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                        <th style={{ padding: "12px 16px", textAlign: "left", color: "#475569", fontWeight: 700 }}>
+                          Authority Details (अधिकारी विवरण)
+                        </th>
+                        <th style={{ padding: "12px 16px", textAlign: "left", color: "#475569", fontWeight: 700 }}>
+                          Health Facility Jurisdiction (अस्पताल अधिकार क्षेत्र)
+                        </th>
+                        <th style={{ padding: "12px 16px", textAlign: "left", color: "#475569", fontWeight: 700 }}>
+                          Login ID (यूजरनेम)
+                        </th>
+                        <th style={{ padding: "12px 16px", textAlign: "center", color: "#475569", fontWeight: 700 }}>
+                          Workload Activity
+                        </th>
+                        <th style={{ padding: "12px 16px", textAlign: "center", color: "#475569", fontWeight: 700 }}>
+                          Status & Applications Control
+                        </th>
+                        <th style={{ padding: "12px 16px", textAlign: "right", color: "#475569", fontWeight: 700 }}>
+                          Actions (कार्रवाई)
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedVerifiers.map((v) => (
+                        <tr
+                          key={v.id}
+                          style={{
+                            borderBottom: "1px solid #f1f5f9",
+                            background: v.isActive ? "white" : "#fffbfa",
+                            transition: "background 0.15s ease",
+                          }}
+                        >
+                          {/* Column 1: Authority Details */}
+                          <td style={{ padding: "14px 16px", verticalAlign: "middle" }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                              <div
+                                style={{
+                                  width: 36,
+                                  height: 36,
+                                  borderRadius: "50%",
+                                  background: v.isActive ? "#eff6ff" : "#fef2f2",
+                                  border: `1px solid ${v.isActive ? "#bfdbfe" : "#fecaca"}`,
+                                  color: v.isActive ? "#1d4ed8" : "#dc2626",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontWeight: 700,
+                                  fontSize: 14,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {v.authorityName ? v.authorityName.charAt(0).toUpperCase() : <User size={16} />}
+                              </div>
+                              <div>
+                                <strong style={{ display: "block", fontSize: 13.5, color: "#0f172a" }}>
+                                  {v.authorityName || "Nodal Verification Officer"}
+                                </strong>
+                                <span style={{ fontSize: 11.5, color: "#64748b" }}>
+                                  {v.designation || "Facility Verification Officer / MOIC"}
+                                </span>
+                                {(v.contactNumber || v.email) && (
+                                  <div style={{ display: "flex", gap: 10, marginTop: 4, fontSize: 11, color: "#64748b" }}>
+                                    {v.contactNumber && (
+                                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                                        <Phone size={11} /> {v.contactNumber}
+                                      </span>
+                                    )}
+                                    {v.email && (
+                                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                                        <Mail size={11} /> {v.email}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Column 2: Health Facility Jurisdiction */}
+                          <td style={{ padding: "14px 16px", verticalAlign: "middle" }}>
+                            <div style={{ fontWeight: 600, color: "#1e293b", fontSize: 13 }}>
+                              {v.facility}
+                            </div>
+                            <div style={{ marginTop: 4 }}>
+                              {v.isActive ? (
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 4,
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    color: "#15803d",
+                                    background: "#f0fdf4",
+                                    padding: "2px 7px",
+                                    borderRadius: 4,
+                                    border: "1px solid #bbf7d0",
+                                  }}
+                                >
+                                  ✓ Applications Allowed (आवेदन स्वीकार्य)
+                                </span>
+                              ) : (
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 4,
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    color: "#b91c1c",
+                                    background: "#fef2f2",
+                                    padding: "2px 7px",
+                                    borderRadius: 4,
+                                    border: "1px solid #fecaca",
+                                  }}
+                                >
+                                  ⚠️ Applications Suspended (आवेदन निलंबित)
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Column 3: Login ID */}
+                          <td style={{ padding: "14px 16px", verticalAlign: "middle" }}>
+                            <div
+                              style={{
+                                fontFamily: "ui-monospace, monospace",
+                                fontWeight: 700,
+                                fontSize: 12.5,
+                                color: "#1e40af",
+                                background: "#eff6ff",
+                                padding: "4px 8px",
+                                borderRadius: 6,
+                                display: "inline-block",
+                                border: "1px solid #bfdbfe",
+                              }}
+                            >
+                              {v.username}
+                            </div>
+                            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                              Added {new Date(v.createdAt).toLocaleDateString("en-IN")}
+                            </div>
+                          </td>
+
+                          {/* Column 4: Workload Activity */}
+                          <td style={{ padding: "14px 16px", textAlign: "center", verticalAlign: "middle" }}>
+                            <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
+                              <div style={{ textAlign: "center" }}>
+                                <span style={{ fontSize: 11, color: "#64748b", display: "block" }}>Pending</span>
+                                <strong
+                                  style={{
+                                    fontSize: 13,
+                                    color: (v.stats?.pendingVerifier ?? 0) > 0 ? "#d97706" : "#64748b",
+                                  }}
+                                >
+                                  {v.stats?.pendingVerifier ?? 0}
+                                </strong>
+                              </div>
+                              <div style={{ width: 1, height: 24, background: "#e2e8f0" }} />
+                              <div style={{ textAlign: "center" }}>
+                                <span style={{ fontSize: 11, color: "#64748b", display: "block" }}>Verified</span>
+                                <strong style={{ fontSize: 13, color: "#16a34a" }}>
+                                  {(v.stats?.pendingOperator ?? 0) + (v.stats?.completed ?? 0)}
+                                </strong>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Column 5: Operational Status & Effects */}
+                          <td style={{ padding: "14px 16px", textAlign: "center", verticalAlign: "middle" }}>
+                            {v.isActive ? (
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  padding: "4px 10px",
+                                  borderRadius: 20,
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  background: "#dcfce7",
+                                  color: "#15803d",
+                                  border: "1px solid #86efac",
+                                }}
+                              >
+                                <Check size={13} /> Active (सक्रिय)
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  padding: "4px 10px",
+                                  borderRadius: 20,
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  background: "#fee2e2",
+                                  color: "#dc2626",
+                                  border: "1px solid #fca5a5",
+                                }}
+                              >
+                                <X size={13} /> Inactive (निष्क्रिय)
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Column 6: Actions */}
+                          <td style={{ padding: "14px 16px", textAlign: "right", verticalAlign: "middle" }}>
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, alignItems: "center" }}>
+                              {/* Toggle Active/Inactive Button */}
+                              <button
+                                disabled={toggleLoadingId === v.id}
+                                onClick={() => setConfirmToggleModal(v)}
+                                title={
+                                  v.isActive
+                                    ? "Click to deactivate this verifier (blocks login and hospital applications)"
+                                    : "Click to activate this verifier (allows login and hospital applications)"
+                                }
+                                style={{
+                                  padding: "6px 12px",
+                                  borderRadius: 6,
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  border: "1px solid",
+                                  cursor: "pointer",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  background: v.isActive ? "#fef2f2" : "#f0fdf4",
+                                  borderColor: v.isActive ? "#fecaca" : "#bbf7d0",
+                                  color: v.isActive ? "#dc2626" : "#16a34a",
+                                  transition: "all 0.15s ease",
+                                }}
+                              >
+                                <Power size={12} />
+                                {v.isActive ? "Deactivate (निष्क्रिय करें)" : "Activate (सक्रिय करें)"}
+                              </button>
+
+                              {/* Reset Password Button */}
+                              <button
+                                onClick={() => {
+                                  setShowResetPasswordModal(v);
+                                  setResetPasswordVal("");
+                                  setResetPasswordError("");
+                                }}
+                                title="Reset login password"
+                                style={{
+                                  padding: "6px 10px",
+                                  background: "white",
+                                  border: "1px solid #cbd5e1",
+                                  borderRadius: 6,
+                                  color: "#475569",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                }}
+                              >
+                                <KeyRound size={12} /> Password
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Verifier Pagination Controls */}
+              {verifierTotalPages > 1 && !verifiersLoading && filteredVerifiers.length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "14px 20px",
+                    background: "#f8fafc",
+                    borderTop: "1px solid #e2e8f0",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ fontSize: 13, color: "#64748b" }}>
+                    Showing <strong>{((verifierPage - 1) * VERIFIERS_PER_PAGE) + 1}</strong> - <strong>{Math.min(verifierPage * VERIFIERS_PER_PAGE, filteredVerifiers.length)}</strong> of <strong>{filteredVerifiers.length}</strong> verifiers
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <button
+                      onClick={() => setVerifierPage(1)}
+                      disabled={verifierPage === 1}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        border: "1px solid #cbd5e1",
+                        background: verifierPage === 1 ? "#f1f5f9" : "white",
+                        color: verifierPage === 1 ? "#94a3b8" : "#334155",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: verifierPage === 1 ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      « First
+                    </button>
+                    <button
+                      onClick={() => setVerifierPage((p) => Math.max(1, p - 1))}
+                      disabled={verifierPage === 1}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        border: "1px solid #cbd5e1",
+                        background: verifierPage === 1 ? "#f1f5f9" : "white",
+                        color: verifierPage === 1 ? "#94a3b8" : "#334155",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: verifierPage === 1 ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      ‹ Prev
+                    </button>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: "#1e293b", margin: "0 6px" }}>
+                      Page {verifierPage} of {verifierTotalPages}
+                    </span>
+                    <button
+                      onClick={() => setVerifierPage((p) => Math.min(verifierTotalPages, p + 1))}
+                      disabled={verifierPage === verifierTotalPages}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        border: "1px solid #cbd5e1",
+                        background: verifierPage === verifierTotalPages ? "#f1f5f9" : "white",
+                        color: verifierPage === verifierTotalPages ? "#94a3b8" : "#334155",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: verifierPage === verifierTotalPages ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      Next ›
+                    </button>
+                    <button
+                      onClick={() => setVerifierPage(verifierTotalPages)}
+                      disabled={verifierPage === verifierTotalPages}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        border: "1px solid #cbd5e1",
+                        background: verifierPage === verifierTotalPages ? "#f1f5f9" : "white",
+                        color: verifierPage === verifierTotalPages ? "#94a3b8" : "#334155",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: verifierPage === verifierTotalPages ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      Last »
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>
@@ -1379,7 +2415,34 @@ export default function OperatorDashboard() {
                   <div><span style={{ color: "#6b7280", fontSize: 13 }}>Name:</span> <p style={{ fontWeight: 600, margin: 0 }}>{viewingApp.child.name}</p></div>
                   <div><span style={{ color: "#6b7280", fontSize: 13 }}>Gender:</span> <p style={{ fontWeight: 600, margin: 0 }}>{viewingApp.child.gender}</p></div>
                   <div><span style={{ color: "#6b7280", fontSize: 13 }}>Date of Birth:</span> <p style={{ fontWeight: 600, margin: 0 }}>{new Date(viewingApp.child.dateOfBirth).toLocaleDateString("en-IN")}</p></div>
-                  <div><span style={{ color: "#6b7280", fontSize: 13 }}>Child Aadhaar:</span> <p style={{ fontWeight: 600, margin: 0 }}>{viewingApp.child.adharNumber || "—"}</p></div>
+                  <div>
+                    <span style={{ color: "#6b7280", fontSize: 13 }}>Child Aadhaar:</span>
+                    <p style={{ fontWeight: 600, margin: 0 }}>{viewingApp.child.adharNumber || "—"}</p>
+                    {viewingApp.child.adharCardUrl && (
+                      <div style={{ marginTop: 4 }}>
+                        <a
+                          href={getDocumentViewUrl(viewingApp.child.adharCardUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            padding: "3px 8px",
+                            background: "#eff6ff",
+                            border: "1px solid #bfdbfe",
+                            borderRadius: 6,
+                            color: "#1d4ed8",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            textDecoration: "none",
+                          }}
+                        >
+                          <ExternalLink size={11} /> View Child Aadhaar
+                        </a>
+                      </div>
+                    )}
+                  </div>
                   <div><span style={{ color: "#6b7280", fontSize: 13 }}>Weight (kg):</span> <p style={{ fontWeight: 600, margin: 0 }}>{viewingApp.child.weight ? viewingApp.child.weight + " kg" : "—"}</p></div>
                   <div><span style={{ color: "#6b7280", fontSize: 13 }}>Pregnancy Duration:</span> <p style={{ fontWeight: 600, margin: 0 }}>{viewingApp.child.pregnancyDuration ? viewingApp.child.pregnancyDuration + " weeks" : "—"}</p></div>
                   <div><span style={{ color: "#6b7280", fontSize: 13 }}>Delivery Method:</span> <p style={{ fontWeight: 600, margin: 0 }}>{viewingApp.child.deliveryMethod || "—"}</p></div>
@@ -1409,6 +2472,32 @@ export default function OperatorDashboard() {
                     <div style={{ fontSize: 14, color: "#111827" }}>
                       <p style={{ margin: "4px 0" }}><strong>Name:</strong> {viewingApp.parents.mother.name}</p>
                       <p style={{ margin: "4px 0" }}><strong>Aadhaar:</strong> {viewingApp.parents.mother.adharNumber || "—"}</p>
+                      {viewingApp.parents.mother.adharCardUrl ? (
+                        <div style={{ margin: "6px 0" }}>
+                          <a
+                            href={getDocumentViewUrl(viewingApp.parents.mother.adharCardUrl)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 5,
+                              padding: "4px 10px",
+                              background: "#eff6ff",
+                              border: "1px solid #bfdbfe",
+                              borderRadius: 6,
+                              color: "#1d4ed8",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              textDecoration: "none",
+                            }}
+                          >
+                            <ExternalLink size={12} /> View Mother Aadhaar
+                          </a>
+                        </div>
+                      ) : (
+                        <p style={{ margin: "4px 0", fontSize: 11, color: "#9ca3af" }}>Aadhaar Card: Not uploaded</p>
+                      )}
                       <p style={{ margin: "4px 0" }}><strong>Mobile:</strong> {viewingApp.parents.mother.mobileNumber}</p>
                       <p style={{ margin: "4px 0" }}><strong>Email:</strong> {viewingApp.parents.mother.email || "—"}</p>
                     </div>
@@ -1418,7 +2507,33 @@ export default function OperatorDashboard() {
                     <div style={{ fontSize: 14, color: "#111827" }}>
                       <p style={{ margin: "4px 0" }}><strong>Name:</strong> {viewingApp.parents.father.name}</p>
                       <p style={{ margin: "4px 0" }}><strong>Aadhaar:</strong> {viewingApp.parents.father.adharNumber || "—"}</p>
-                      <p style={{ margin: "4px 0" }}><strong>Mobile:</strong> {viewingApp.parents.father.mobileNumber || "—"}</p>
+                      {viewingApp.parents.father.adharCardUrl ? (
+                        <div style={{ margin: "6px 0" }}>
+                          <a
+                            href={getDocumentViewUrl(viewingApp.parents.father.adharCardUrl)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 5,
+                              padding: "4px 10px",
+                              background: "#eff6ff",
+                              border: "1px solid #bfdbfe",
+                              borderRadius: 6,
+                              color: "#1d4ed8",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              textDecoration: "none",
+                            }}
+                          >
+                            <ExternalLink size={12} /> View Father Aadhaar
+                          </a>
+                        </div>
+                      ) : (
+                        <p style={{ margin: "4px 0", fontSize: 11, color: "#9ca3af" }}>Aadhaar Card: Not uploaded</p>
+                      )}
+                      <p style={{ margin: "4px 0" }}><strong>Mobile:</strong> {viewingApp.parents.father.mobileNumber}</p>
                       <p style={{ margin: "4px 0" }}><strong>Email:</strong> {viewingApp.parents.father.email || "—"}</p>
                     </div>
                   </div>
@@ -1457,7 +2572,34 @@ export default function OperatorDashboard() {
                 <div className="resp-grid-2">
                   <div><span style={{ color: "#6b7280", fontSize: 13 }}>Name:</span> <p style={{ fontWeight: 600, margin: 0 }}>{viewingApp.informationProvider.name}</p></div>
                   <div><span style={{ color: "#6b7280", fontSize: 13 }}>Relation:</span> <p style={{ fontWeight: 600, margin: 0 }}>{viewingApp.informationProvider.relationToChild || viewingApp.informationProvider.relation || "—"}</p></div>
-                  <div><span style={{ color: "#6b7280", fontSize: 13 }}>Aadhaar:</span> <p style={{ fontWeight: 600, margin: 0 }}>{viewingApp.informationProvider.adharNumber || "—"}</p></div>
+                  <div>
+                    <span style={{ color: "#6b7280", fontSize: 13 }}>Aadhaar:</span>
+                    <p style={{ fontWeight: 600, margin: 0 }}>{viewingApp.informationProvider.adharNumber || "—"}</p>
+                    {viewingApp.informationProvider.adharCardUrl && (
+                      <div style={{ marginTop: 4 }}>
+                        <a
+                          href={getDocumentViewUrl(viewingApp.informationProvider.adharCardUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            padding: "3px 8px",
+                            background: "#eff6ff",
+                            border: "1px solid #bfdbfe",
+                            borderRadius: 6,
+                            color: "#1d4ed8",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            textDecoration: "none",
+                          }}
+                        >
+                          <ExternalLink size={11} /> View Informant Aadhaar
+                        </a>
+                      </div>
+                    )}
+                  </div>
                   <div><span style={{ color: "#6b7280", fontSize: 13 }}>Mobile:</span> <p style={{ fontWeight: 600, margin: 0 }}>{viewingApp.informationProvider.mobileNumber}</p></div>
                   <div><span style={{ color: "#6b7280", fontSize: 13 }}>Email:</span> <p style={{ fontWeight: 600, margin: 0 }}>{viewingApp.informationProvider.email || "—"}</p></div>
                   <div><span style={{ color: "#6b7280", fontSize: 13 }}>Legal Declaration:</span> <p style={{ fontWeight: 600, margin: 0, color: viewingApp.informationProvider.declarationAccepted ? "#16a34a" : "#dc2626" }}>{viewingApp.informationProvider.declarationAccepted ? "✓ Accepted (Sec 23)" : "Not Accepted"}</p></div>
@@ -1473,6 +2615,82 @@ export default function OperatorDashboard() {
                     </p>
                   </div>
                 )}
+              </div>
+
+              {/* Uploaded Aadhaar Documents for Verification */}
+              <div style={{ marginBottom: 24 }}>
+                <h4 style={{ fontSize: 15, fontWeight: 700, color: "#1e40af", marginBottom: 12, borderBottom: "1px solid #bfdbfe", paddingBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                  <FileCheck size={16} /> Uploaded Aadhaar Documents for Verification (सत्यापन हेतु आधार दस्तावेज़)
+                </h4>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                  {[
+                    { title: "Mother's Aadhaar (माता)", num: viewingApp.parents?.mother?.adharNumber, url: viewingApp.parents?.mother?.adharCardUrl },
+                    { title: "Father's Aadhaar (पिता)", num: viewingApp.parents?.father?.adharNumber, url: viewingApp.parents?.father?.adharCardUrl },
+                    { title: "Informant's Aadhaar (सूचनादाता)", num: viewingApp.informationProvider?.adharNumber, url: viewingApp.informationProvider?.adharCardUrl },
+                    { title: "Child's Aadhaar (शिशु)", num: viewingApp.child?.adharNumber, url: viewingApp.child?.adharCardUrl },
+                  ].map((doc, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        background: doc.url ? "#f0fdf4" : "#f9fafb",
+                        border: `1px solid ${doc.url ? "#86efac" : "#e5e7eb"}`,
+                        borderRadius: 10,
+                        padding: 12,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                          <strong style={{ fontSize: 12.5, color: "#1e293b" }}>{doc.title}</strong>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              padding: "2px 6px",
+                              borderRadius: 4,
+                              background: doc.url ? "#dcfce7" : "#f1f5f9",
+                              color: doc.url ? "#15803d" : "#64748b",
+                            }}
+                          >
+                            {doc.url ? "✓ Cloudinary" : "Not Provided"}
+                          </span>
+                        </div>
+                        <p style={{ margin: "0 0 8px", fontSize: 12, color: "#475569" }}>
+                          <strong>No:</strong> {doc.num || "—"}
+                        </p>
+                      </div>
+                      {doc.url ? (
+                        <a
+                          href={getDocumentViewUrl(doc.url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "6px 12px",
+                            background: "#16a34a",
+                            color: "white",
+                            borderRadius: 6,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            textDecoration: "none",
+                            width: "100%",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <ExternalLink size={13} /> View Document (देखें)
+                        </a>
+                      ) : (
+                        <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center", padding: "6px 0" }}>
+                          दस्तावेज़ संलग्न नहीं (No file uploaded)
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Statistical/Demographic Details */}
@@ -1609,6 +2827,625 @@ export default function OperatorDashboard() {
                 {actionLoading === showUploadModal && <span className="spinner" style={{ width: 16, height: 16 }} />}
                 Upload & Complete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* REGISTER NEW VERIFIER MODAL */}
+      {/* ========================================================================= */}
+      {showNewVerifierModal && (
+        <div
+          data-lenis-prevent="true"
+          onWheel={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !newVerifierLoading) setShowNewVerifierModal(false);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1200,
+            padding: 16,
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 18,
+              width: "100%",
+              maxWidth: 580,
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+              overflow: "hidden",
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: "16px 22px",
+                borderBottom: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: "#f8fafc",
+              }}
+            >
+              <div>
+                <h3 style={{ fontSize: 17, fontWeight: 800, color: "#0f172a", margin: 0 }}>
+                  Register New Hospital Verifier (नया सत्यापनकर्ता जोड़ें)
+                </h3>
+                <p style={{ color: "#64748b", fontSize: 12.5, margin: "3px 0 0" }}>
+                  Create credentials and assign hospital jurisdiction in Madhubani District.
+                </p>
+              </div>
+              <button
+                disabled={newVerifierLoading}
+                onClick={() => setShowNewVerifierModal(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 22,
+                  cursor: "pointer",
+                  color: "#94a3b8",
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Body / Form */}
+            <form onSubmit={handleCreateVerifier} style={{ padding: "20px 22px", overflowY: "auto" }}>
+              {newVerifierError && (
+                <div
+                  style={{
+                    background: "#fef2f2",
+                    border: "1px solid #fecaca",
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    color: "#dc2626",
+                    fontSize: 13,
+                    marginBottom: 16,
+                  }}
+                >
+                  ⚠️ {newVerifierError}
+                </div>
+              )}
+
+              {newVerifierSuccess && (
+                <div
+                  style={{
+                    background: "#f0fdf4",
+                    border: "1px solid #bbf7d0",
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    color: "#16a34a",
+                    fontSize: 13,
+                    marginBottom: 16,
+                  }}
+                >
+                  ✓ {newVerifierSuccess}
+                </div>
+              )}
+
+              {/* Facility Dropdown */}
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                  Designated Healthcare Facility (स्वास्थ्य केंद्र) *
+                </label>
+                <select
+                  required
+                  value={newVerifierForm.facility}
+                  onChange={(e) => {
+                    const fac = e.target.value;
+                    const slug = fac.toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "").slice(0, 20);
+                    setNewVerifierForm((p) => ({
+                      ...p,
+                      facility: fac,
+                      username: p.username ? p.username : `verifier_${slug}`,
+                    }));
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    border: "1.5px solid #cbd5e1",
+                    borderRadius: 8,
+                    fontSize: 13.5,
+                    color: "#0f172a",
+                    background: "white",
+                  }}
+                >
+                  <option value="">— Select Hospital / Facility —</option>
+                  {Object.entries(facilitiesByBlock).map(([block, facList]) => (
+                    <optgroup key={block} label={`📍 ${block} Block (${facList.length})`}>
+                      {facList.map((fac) => {
+                        const facName = typeof fac === "string" ? fac : fac?.name;
+                        return (
+                          <option key={facName} value={facName}>
+                            {facName}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+
+              {/* Grid 2 cols for Username & Password */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                    Login ID / Username *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. verifier_sdh_jaynagar"
+                    value={newVerifierForm.username}
+                    onChange={(e) =>
+                      setNewVerifierForm((p) => ({
+                        ...p,
+                        username: e.target.value.toLowerCase().replace(/\s+/g, "_"),
+                      }))
+                    }
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      border: "1.5px solid #cbd5e1",
+                      borderRadius: 8,
+                      fontSize: 13.5,
+                      color: "#0f172a",
+                      fontFamily: "ui-monospace, monospace",
+                    }}
+                  />
+                  <span style={{ fontSize: 11, color: "#94a3b8" }}>3-30 lowercase characters, underscores</span>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                    Password (पासवर्ड) *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    placeholder="Min 6 characters"
+                    value={newVerifierForm.password}
+                    onChange={(e) => setNewVerifierForm((p) => ({ ...p, password: e.target.value }))}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      border: "1.5px solid #cbd5e1",
+                      borderRadius: 8,
+                      fontSize: 13.5,
+                      color: "#0f172a",
+                    }}
+                  />
+                  <span style={{ fontSize: 11, color: "#94a3b8" }}>At least 6 characters</span>
+                </div>
+              </div>
+
+              {/* Authority Details: Name & Designation */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                    Authority Officer Full Name (अधिकारी का नाम) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Dr. Anil Kumar Jha"
+                    value={newVerifierForm.authorityName}
+                    onChange={(e) => setNewVerifierForm((p) => ({ ...p, authorityName: e.target.value }))}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      border: "1.5px solid #cbd5e1",
+                      borderRadius: 8,
+                      fontSize: 13.5,
+                      color: "#0f172a",
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                    Official Designation (पदनाम)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. MOIC / Health Manager / Registrar"
+                    value={newVerifierForm.designation}
+                    onChange={(e) => setNewVerifierForm((p) => ({ ...p, designation: e.target.value }))}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      border: "1.5px solid #cbd5e1",
+                      borderRadius: 8,
+                      fontSize: 13.5,
+                      color: "#0f172a",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Mobile & Email */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                    Official Mobile Number (मोबाइल नंबर)
+                  </label>
+                  <input
+                    type="tel"
+                    maxLength={10}
+                    placeholder="10-digit mobile"
+                    value={newVerifierForm.contactNumber}
+                    onChange={(e) =>
+                      setNewVerifierForm((p) => ({
+                        ...p,
+                        contactNumber: e.target.value.replace(/\D/g, "").slice(0, 10),
+                      }))
+                    }
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      border: "1.5px solid #cbd5e1",
+                      borderRadius: 8,
+                      fontSize: 13.5,
+                      color: "#0f172a",
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                    Official Email (ईमेल)
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="e.g. moic.jaynagar@bihar.gov.in"
+                    value={newVerifierForm.email}
+                    onChange={(e) => setNewVerifierForm((p) => ({ ...p, email: e.target.value }))}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      border: "1.5px solid #cbd5e1",
+                      borderRadius: 8,
+                      fontSize: 13.5,
+                      color: "#0f172a",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Policy note */}
+              <div
+                style={{
+                  background: "#eff6ff",
+                  border: "1px solid #bfdbfe",
+                  borderRadius: 8,
+                  padding: "10px 12px",
+                  fontSize: 12,
+                  color: "#1e40af",
+                  marginBottom: 20,
+                  lineHeight: 1.45,
+                }}
+              >
+                ℹ️ <strong>नोट:</strong> खाता बनते ही यह सत्यापनकर्ता सक्रिय (Active) रहेगा तथा इस अस्पताल के लिए नागरिक पोर्टल पर जन्म निबंधन आवेदन प्रस्तुत किए जा सकेंगे।
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  disabled={newVerifierLoading}
+                  onClick={() => setShowNewVerifierModal(false)}
+                  style={{
+                    padding: "10px 18px",
+                    background: "white",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    color: "#475569",
+                    cursor: "pointer",
+                  }}
+                >
+                  रद्द करें (Cancel)
+                </button>
+                <button
+                  type="submit"
+                  disabled={newVerifierLoading}
+                  style={{
+                    padding: "10px 22px",
+                    background: newVerifierLoading ? "#93c5fd" : "#1e40af",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 8,
+                    fontSize: 13.5,
+                    fontWeight: 700,
+                    cursor: newVerifierLoading ? "not-allowed" : "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  {newVerifierLoading ? "Creating..." : "सत्यापनकर्ता पंजीकृत करें (Create Verifier)"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* RESET VERIFIER PASSWORD MODAL */}
+      {/* ========================================================================= */}
+      {showResetPasswordModal && (
+        <div
+          data-lenis-prevent="true"
+          onWheel={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !resetPasswordLoading) setShowResetPasswordModal(null);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1200,
+            padding: 16,
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 16,
+              width: "100%",
+              maxWidth: 440,
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
+              <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0 }}>
+                Reset Password (पासवर्ड बदलें)
+              </h3>
+              <p style={{ color: "#64748b", fontSize: 12, margin: "3px 0 0" }}>
+                Username: <strong style={{ color: "#1e40af" }}>{showResetPasswordModal.username}</strong> ({showResetPasswordModal.facility})
+              </p>
+            </div>
+
+            <form onSubmit={handleResetPassword} style={{ padding: "18px 20px" }}>
+              {resetPasswordError && (
+                <div
+                  style={{
+                    background: "#fef2f2",
+                    border: "1px solid #fecaca",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    color: "#dc2626",
+                    fontSize: 12.5,
+                    marginBottom: 14,
+                  }}
+                >
+                  ⚠️ {resetPasswordError}
+                </div>
+              )}
+
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                  New Password (नया पासवर्ड) *
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  placeholder="Enter new password (min 6 characters)"
+                  value={resetPasswordVal}
+                  onChange={(e) => setResetPasswordVal(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    border: "1.5px solid #cbd5e1",
+                    borderRadius: 8,
+                    fontSize: 13.5,
+                    color: "#0f172a",
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  disabled={resetPasswordLoading}
+                  onClick={() => setShowResetPasswordModal(null)}
+                  style={{
+                    padding: "9px 16px",
+                    background: "white",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#475569",
+                    cursor: "pointer",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resetPasswordLoading || !resetPasswordVal.trim()}
+                  style={{
+                    padding: "9px 18px",
+                    background: resetPasswordLoading ? "#93c5fd" : "#1e40af",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: resetPasswordLoading ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {resetPasswordLoading ? "Saving..." : "Save New Password (अपडेट करें)"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* CONFIRM TOGGLE ACTIVE/INACTIVE MODAL */}
+      {/* ========================================================================= */}
+      {confirmToggleModal && (
+        <div
+          data-lenis-prevent="true"
+          onWheel={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !toggleLoadingId) setConfirmToggleModal(null);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1250,
+            padding: 16,
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 18,
+              width: "100%",
+              maxWidth: 480,
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.3)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "16px 20px",
+                background: confirmToggleModal.isActive ? "#fef2f2" : "#f0fdf4",
+                borderBottom: `1px solid ${confirmToggleModal.isActive ? "#fecaca" : "#bbf7d0"}`,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              {confirmToggleModal.isActive ? (
+                <AlertTriangle size={22} color="#dc2626" />
+              ) : (
+                <CheckCircle2 size={22} color="#16a34a" />
+              )}
+              <h3 style={{ fontSize: 16, fontWeight: 800, color: confirmToggleModal.isActive ? "#991b1b" : "#166534", margin: 0 }}>
+                {confirmToggleModal.isActive
+                  ? "सत्यापनकर्ता को निष्क्रिय करें? (Deactivate Verifier?)"
+                  : "सत्यापनकर्ता को पुनः सक्रिय करें? (Activate Verifier?)"}
+              </h3>
+            </div>
+
+            <div style={{ padding: "20px" }}>
+              <p style={{ fontSize: 13.5, color: "#334155", lineHeight: 1.6, margin: "0 0 16px" }}>
+                {confirmToggleModal.isActive ? (
+                  <>
+                    क्या आप सुनिश्चित हैं कि आप <strong>{confirmToggleModal.username}</strong> (
+                    <em>{confirmToggleModal.facility}</em>) को निष्क्रिय (Inactive) करना चाहते हैं?
+                  </>
+                ) : (
+                  <>
+                    क्या आप <strong>{confirmToggleModal.username}</strong> (
+                    <em>{confirmToggleModal.facility}</em>) को पुनः सक्रिय (Active) करना चाहते हैं?
+                  </>
+                )}
+              </p>
+
+              <div
+                style={{
+                  background: confirmToggleModal.isActive ? "#fffbeb" : "#eff6ff",
+                  border: `1px solid ${confirmToggleModal.isActive ? "#fde68a" : "#bfdbfe"}`,
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  fontSize: 12.5,
+                  color: confirmToggleModal.isActive ? "#92400e" : "#1e40af",
+                  lineHeight: 1.5,
+                  marginBottom: 20,
+                }}
+              >
+                {confirmToggleModal.isActive ? (
+                  <>
+                    ⚠️ <strong>प्रभाव (Impact):</strong>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                      <li>यह सत्यापनकर्ता तुरंत लॉग आउट हो जाएगा और पुनः लॉगिन नहीं कर सकेगा।</li>
+                      <li>
+                        नागरिक पोर्टल पर <strong>{confirmToggleModal.facility}</strong> के लिए नए जन्म प्रमाण पत्र आवेदन अवरुद्ध (Blocked) हो जाएँगे।
+                      </li>
+                    </ul>
+                  </>
+                ) : (
+                  <>
+                    ✓ <strong>प्रभाव (Impact):</strong>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                      <li>सत्यापनकर्ता तुरंत अपने डैशबोर्ड में लॉगिन कर सकेंगे।</li>
+                      <li>इस अस्पताल के लिए नए आवेदन पुनः स्वीकार किए जाने लगेंगे।</li>
+                    </ul>
+                  </>
+                )}
+              </div>
+
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  disabled={toggleLoadingId !== null}
+                  onClick={() => setConfirmToggleModal(null)}
+                  style={{
+                    padding: "10px 16px",
+                    background: "white",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#475569",
+                    cursor: "pointer",
+                  }}
+                >
+                  रद्द करें (Cancel)
+                </button>
+                <button
+                  type="button"
+                  disabled={toggleLoadingId !== null}
+                  onClick={() => handleToggleVerifierStatus(confirmToggleModal)}
+                  style={{
+                    padding: "10px 18px",
+                    background: confirmToggleModal.isActive ? "#dc2626" : "#16a34a",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  {toggleLoadingId ? "Processing..." : confirmToggleModal.isActive ? "हाँ, निष्क्रिय करें (Deactivate)" : "हाँ, सक्रिय करें (Activate)"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

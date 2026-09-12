@@ -1,6 +1,7 @@
 "use client";
 import { use, useEffect, useState, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { STATUS_CONFIG } from "@/utils/constants";
 import gsap from "gsap";
 
@@ -26,6 +27,7 @@ function getStepStatus(appStatus) {
 
 export default function TrackDetailPage({ params }) {
   const { trackingNumber } = use(params);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -233,27 +235,82 @@ export default function TrackDetailPage({ params }) {
       ref={containerRef}
       style={{ minHeight: "100vh", background: "#f9fafb" }}
     >
-      {/* Header */}
-      <div
+      <style>{`
+        /* Responsive Navigation */
+        .desktop-nav {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+        .mobile-menu-btn {
+          display: none;
+          background: transparent;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 8px 12px;
+          font-size: 20px;
+          line-height: 1;
+          color: #374151;
+          cursor: pointer;
+        }
+        .mobile-nav-drawer {
+          display: none;
+          flex-direction: column;
+          gap: 8px;
+          padding: 14px 0 16px;
+          border-top: 1px solid #e5e7eb;
+        }
+        .nav-link {
+          transition: background 0.2s, color 0.2s;
+          text-decoration: none;
+        }
+        .nav-link:hover {
+          background: #f1f5f9;
+          color: #1e40af !important;
+        }
+        @media (max-width: 768px) {
+          .desktop-nav {
+            display: none !important;
+          }
+          .mobile-menu-btn {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+          }
+          .mobile-nav-drawer.open {
+            display: flex !important;
+          }
+          .header-subtext {
+            display: none;
+          }
+        }
+      `}</style>
+
+      {/* Sticky Header / Navbar */}
+      <header
         className="anim-detail-header"
         style={{
-          background: "white",
           borderBottom: "1px solid #e5e7eb",
-          padding: "12px 16px",
+          padding: "0 16px",
+          position: "sticky",
+          top: 0,
+          background: "rgba(255,255,255,0.96)",
+          backdropFilter: "blur(12px)",
+          zIndex: 100,
         }}
       >
         <div
           style={{
-            maxWidth: 700,
+            maxWidth: 1200,
             margin: "0 auto",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 10,
+            minHeight: 64,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* Government of Bihar Emblem */}
             <Link
               href="/"
               style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0 }}
@@ -263,9 +320,9 @@ export default function TrackDetailPage({ params }) {
                 src="/bihar_government.webp"
                 alt="Government of Bihar Seal"
                 style={{
-                  height: 38,
+                  height: 42,
                   width: "auto",
-                  maxHeight: 38,
+                  maxHeight: 42,
                   objectFit: "contain",
                   display: "block",
                 }}
@@ -276,52 +333,191 @@ export default function TrackDetailPage({ params }) {
               />
             </Link>
 
+            {/* Vertical Divider */}
             <div
               style={{
                 width: 1,
-                height: 32,
+                height: 36,
                 backgroundColor: "#d1d5db",
                 flexShrink: 0,
               }}
               aria-hidden="true"
             />
 
-            <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-              <img
+            {/* Birth Portal Logo & Title */}
+            <Link
+              href="/"
+              style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}
+            >
+              <Image
                 src="/baby_birth.svg"
                 alt="Birth Certificate Portal Logo"
-                style={{ width: 34, height: 34, objectFit: "contain", flexShrink: 0 }}
+                width={38}
+                height={38}
+                priority
+                loading="eager"
+                style={{ objectFit: "contain", flexShrink: 0 }}
               />
               <div>
                 <div
                   style={{
                     fontWeight: 700,
-                    fontSize: 14,
+                    fontSize: 15,
                     color: "#111827",
                     lineHeight: 1.2,
                   }}
                 >
                   Birth Certificate Portal
                 </div>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>
+                <div
+                  className="header-subtext"
+                  style={{
+                    fontSize: 11,
+                    color: "#6b7280",
+                    fontWeight: 500,
+                  }}
+                >
                   District Administration Madhubani • Govt. of Bihar
                 </div>
               </div>
             </Link>
           </div>
-          <div style={{ display: "flex", gap: 14 }}>
+
+          {/* Desktop Nav */}
+          <nav className="desktop-nav">
             <Link
               href="/track"
-              style={{ color: "#6b7280", fontSize: 13, fontWeight: 500, padding: "4px 0" }}
+              className="nav-link"
+              style={{
+                padding: "8px 14px",
+                borderRadius: 6,
+                color: "#1e40af",
+                background: "#eff6ff",
+                fontSize: 13.5,
+                fontWeight: 600,
+              }}
             >
               ← Track Another
             </Link>
-            <Link href="/" style={{ color: "#6b7280", fontSize: 13, padding: "4px 0" }}>
+            <Link
+              href="/facilities"
+              className="nav-link"
+              style={{
+                padding: "8px 14px",
+                borderRadius: 6,
+                color: "#374151",
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
+              Facility Directory
+            </Link>
+            <Link
+              href="/"
+              className="nav-link"
+              style={{
+                padding: "8px 14px",
+                borderRadius: 6,
+                color: "#374151",
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
               Home
             </Link>
-          </div>
+            <Link
+              href="/apply"
+              style={{
+                padding: "8px 18px",
+                background: "#1e40af",
+                color: "white",
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
+                textDecoration: "none",
+                marginLeft: 4,
+              }}
+            >
+              Apply Online
+            </Link>
+          </nav>
+
+          {/* Mobile Hamburger Toggle */}
+          <button
+            type="button"
+            className="mobile-menu-btn"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? "✕" : "☰"}
+          </button>
         </div>
-      </div>
+
+        {/* Mobile Dropdown Drawer */}
+        <div className={`mobile-nav-drawer ${mobileMenuOpen ? "open" : ""}`}>
+          <Link
+            href="/track"
+            onClick={() => setMobileMenuOpen(false)}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              color: "#1e40af",
+              background: "#eff6ff",
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            ← Track Another Application
+          </Link>
+          <Link
+            href="/facilities"
+            onClick={() => setMobileMenuOpen(false)}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              color: "#374151",
+              fontSize: 14,
+              fontWeight: 500,
+              textDecoration: "none",
+            }}
+          >
+            Facility Directory
+          </Link>
+          <Link
+            href="/"
+            onClick={() => setMobileMenuOpen(false)}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              color: "#374151",
+              fontSize: 14,
+              fontWeight: 500,
+              textDecoration: "none",
+            }}
+          >
+            Home
+          </Link>
+          <Link
+            href="/apply"
+            onClick={() => setMobileMenuOpen(false)}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: "#1e40af",
+              color: "white",
+              fontSize: 14,
+              fontWeight: 600,
+              textAlign: "center",
+              textDecoration: "none",
+              marginTop: 4,
+            }}
+          >
+            Apply Online
+          </Link>
+        </div>
+      </header>
 
       <div style={{ maxWidth: 700, margin: "0 auto", padding: "clamp(20px, 4vw, 32px) clamp(14px, 3vw, 24px)" }}>
         {/* Application Header */}

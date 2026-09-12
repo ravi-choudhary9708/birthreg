@@ -16,6 +16,20 @@ export async function GET(request) {
         let where = {};
 
         if (role === "verifier") {
+            const userId = request.headers.get("x-user-id");
+            if (userId) {
+                const user = await prisma.user.findUnique({
+                    where: { id: userId },
+                    select: { isActive: true },
+                });
+                if (user && user.isActive === false) {
+                    return NextResponse.json(
+                        { success: false, message: "Your verifier account has been deactivated by Operator Central." },
+                        { status: 401 }
+                    );
+                }
+            }
+
             // Verifier strictly sees only applications for their assigned facility (case-insensitive)
             where = {
                 facility: {
@@ -55,11 +69,22 @@ export async function GET(request) {
             createdAt: role === "verifier" ? "asc" : "desc"
         };
 
-        const rawApplications = await prisma.application.findMany({
-            where,
-            orderBy,
-            include: applicationIncludeRelations,
-        });
+        let rawApplications;
+        try {
+            rawApplications = await prisma.application.findMany({
+                where,
+                orderBy,
+                include: applicationIncludeRelations,
+            });
+        } catch (dbErr) {
+            console.warn("Retrying prisma.application.findMany on transient DB error:", dbErr.message);
+            await new Promise((resolve) => setTimeout(resolve, 800));
+            rawApplications = await prisma.application.findMany({
+                where,
+                orderBy,
+                include: applicationIncludeRelations,
+            });
+        }
 
         const applications = rawApplications.map(serializeApplication);
 

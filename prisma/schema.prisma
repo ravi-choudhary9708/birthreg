@@ -24,16 +24,22 @@ enum ApplicationStatus {
 }
 
 model User {
-  id        String   @id @default(uuid()) @db.Uuid
-  username  String   @unique
-  role      String   // "verifier" | "operator"
-  facility  String
-  password  String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(uuid()) @db.Uuid
+  username      String   @unique
+  role          String   // "verifier" | "operator"
+  facility      String
+  password      String
+  isActive      Boolean  @default(true) @map("is_active")
+  authorityName String?  @map("authority_name")
+  designation   String?
+  contactNumber String?  @map("contact_number")
+  email         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@index([username])
   @@index([facility])
+  @@index([isActive])
   @@map("cert_users")
 }
 
@@ -66,6 +72,7 @@ model ChildDetail {
   dateOfBirth       DateTime    @map("date_of_birth")
   gender            String
   adharNumber       String?     @map("adhar_number")
+  adharCardUrl      String?     @map("adhar_card_url")
   weight            Float?
   deliveryAttention String?     @map("delivery_attention")
   deliveryMethod    String?     @map("delivery_method")
@@ -97,12 +104,14 @@ model ParentDetail {
   motherAdhar          String      @map("mother_adhar")
   motherMobile         String      @map("mother_mobile")
   motherEmail          String?     @map("mother_email")
+  motherAdharCardUrl   String?     @map("mother_adhar_card_url")
 
   // Father
   fatherName           String      @map("father_name")
   fatherAdhar          String      @map("father_adhar")
   fatherMobile         String      @map("father_mobile")
   fatherEmail          String?     @map("father_email")
+  fatherAdharCardUrl   String?     @map("father_adhar_card_url")
 
   // Present Address
   presentPlotNumber    String?     @map("present_plot_number")
@@ -138,6 +147,7 @@ model InformantDetail {
 
   name                 String
   adharNumber          String?     @map("adhar_number")
+  adharCardUrl         String?     @map("adhar_card_url")
   mobileNumber         String      @map("mobile_number")
   email                String?
   providedInformation  Boolean     @default(false) @map("provided_information")
@@ -235,5 +245,42 @@ model OtpVerification {
   @@index([applicationNumber])
   @@index([email])
   @@map("otp_verifications")
+}
+
+model Facility {
+  id          String   @id @default(uuid()) @db.Uuid
+  sr          Int?
+  district    String   @default("Madhubani")
+  block       String
+  name        String   @unique
+  rawName     String?  @map("raw_name")
+  type        String
+  category    String?  @default("NA")
+  categoryKey String?  @map("category_key")
+  username    String?  @unique
+  pin         String?
+  phone       String?
+  altPhone    String?  @map("alt_phone")
+  emergency   String?  @default("102 / 104")
+  email       String?  @default("cs-madhubani-bih@gov.in")
+  address     String?
+  timing      String?  @default("24x7 Emergency & Maternity / 9 AM - 5 PM Registry")
+  features    String[] @default([])
+  icon        String?
+  tag         String?
+  level       String?
+  badgeColor  String?  @map("badge_color")
+  badgeBg     String?  @map("badge_bg")
+  badgeBorder String?  @map("badge_border")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([block])
+  @@index([type])
+  @@index([categoryKey])
+  @@index([pin])
+  @@index([isActive])
+  @@map("facilities")
 }
 

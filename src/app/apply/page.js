@@ -1,9 +1,9 @@
 "use client";
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { FACILITIES } from "@/utils/constants";
+import { FACILITIES, FACILITIES_DATA, FACILITIES_BY_BLOCK } from "@/utils/constants";
 import { SUB_DIVISIONS_AND_BLOCKS, getBlocksForSubDivision } from "@/utils/subdivisions";
 import {
   MADHUBANI_POST_OFFICES,
@@ -11,6 +11,8 @@ import {
   isValidMadhubaniPincode,
 } from "@/utils/postOffices";
 import DynamicDatePicker from "@/components/DynamicDatePicker";
+import AadhaarUpload from "@/components/AadhaarUpload";
+import { AlertTriangle, Search, X, Check, Building2, ChevronDown, ChevronUp } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -119,6 +121,13 @@ function ApplyFormContent({ facParam }) {
   const [error, setError] = useState(null);
   const [subDivisionsList, setSubDivisionsList] = useState(SUB_DIVISIONS_AND_BLOCKS);
   const [postOfficesList, setPostOfficesList] = useState(MADHUBANI_POST_OFFICES);
+  const [facilitiesByBlock, setFacilitiesByBlock] = useState(FACILITIES_BY_BLOCK);
+  const [facilitiesList, setFacilitiesList] = useState(FACILITIES_DATA);
+  const [facilitySearch, setFacilitySearch] = useState("");
+  const [facilityDropdownOpen, setFacilityDropdownOpen] = useState(false);
+  const [facilityBlockFilter, setFacilityBlockFilter] = useState("ALL");
+  const facilityDropdownRef = useRef(null);
+  const facilityListScrollRef = useRef(null);
   const containerRef = useRef(null);
 
   useEffect(() => {
@@ -143,7 +152,110 @@ function ApplyFormContent({ facParam }) {
       .catch((err) => {
         console.error("Failed to load post offices from API:", err);
       });
+
+    fetch("/api/facilities")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data?.facilities?.length > 0) {
+          setFacilitiesList(data.data.facilities);
+          const grouped = data.data.facilities.reduce((acc, f) => {
+            const b = f.block || "Other";
+            if (!acc[b]) acc[b] = [];
+            acc[b].push(f.name);
+            return acc;
+          }, {});
+          setFacilitiesByBlock(grouped);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load facilities from database:", err);
+      });
   }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (facilityDropdownRef.current && !facilityDropdownRef.current.contains(event.target)) {
+        setFacilityDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    const el = facilityListScrollRef.current;
+    if (!el || !facilityDropdownOpen) return;
+
+    const handleWheel = (e) => {
+      e.stopPropagation();
+      const isScrollable = el.scrollHeight > el.clientHeight;
+      if (!isScrollable) return;
+
+      const atTop = el.scrollTop <= 0 && e.deltaY < 0;
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1 && e.deltaY > 0;
+
+      if (atTop || atBottom) {
+        e.preventDefault();
+      }
+    };
+
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", handleWheel);
+    };
+  }, [facilityDropdownOpen]);
+
+  const allFacilityBlocks = useMemo(() => {
+    return Array.from(new Set(facilitiesList.map((f) => f.block).filter(Boolean))).sort();
+  }, [facilitiesList]);
+
+  const filteredSearchFacilities = useMemo(() => {
+    const q = facilitySearch.toLowerCase().trim();
+    const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
+
+    return facilitiesList.filter((f) => {
+      const matchesBlock =
+        facilityBlockFilter === "ALL" ||
+        f.block?.toLowerCase() === facilityBlockFilter.toLowerCase();
+      if (!matchesBlock) return false;
+
+      if (tokens.length === 0) return true;
+
+      let searchable = [
+        f.name,
+        f.block,
+        f.type,
+        f.tag,
+        f.pin,
+        f.address,
+        f.rawName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      // Common aliases to ensure direct typing matches accurately
+      if (f.type === "DH" || f.name?.toLowerCase().includes("district hospital")) {
+        searchable += " sadar hospital sadar aspatal apex civil hospital sadar hospital madhubani";
+      }
+      if (f.type === "SDH") {
+        searchable += " anumaandal sub divisional hospital";
+      }
+      if (f.type === "CHC") {
+        searchable += " community health centre samudayik swasthya kendra";
+      }
+      if (f.type === "PHC" || f.type === "APHC") {
+        searchable += " primary health centre prathmik swasthya kendra";
+      }
+      if (f.type === "HSC" || f.type === "HWC" || f.type === "UHWC") {
+        searchable += " sub centre health sub centre up swasthya kendra upkendra wellness";
+      }
+
+      return tokens.every((token) => searchable.includes(token));
+    });
+  }, [facilitiesList, facilitySearch, facilityBlockFilter]);
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger);
@@ -201,6 +313,7 @@ function ApplyFormContent({ facParam }) {
         dateOfBirth: "",
         gender: "",
         adharNumber: "",
+        adharCardUrl: "",
         weight: "",
         deliveryAttention: "Institutional - Government (संस्थागत-सरकारी)",
         deliveryMethod: "Natural / Normal (प्राकृतिक)",
@@ -222,12 +335,14 @@ function ApplyFormContent({ facParam }) {
       mother: {
         name: "",
         adharNumber: "",
+        adharCardUrl: "",
         mobileNumber: "",
         email: "",
       },
       father: {
         name: "",
         adharNumber: "",
+        adharCardUrl: "",
         mobileNumber: "",
         email: "",
       },
@@ -260,6 +375,7 @@ function ApplyFormContent({ facParam }) {
         name: "",
         relationToChild: "Father (पिता)",
         adharNumber: "",
+        adharCardUrl: "",
         mobileNumber: "",
         email: "",
         motherReligion: "Hindu (हिन्दू)",
@@ -276,6 +392,44 @@ function ApplyFormContent({ facParam }) {
     };
   });
 
+  const [facilityStatus, setFacilityStatus] = useState({});
+
+  useEffect(() => {
+    fetch("/api/facilities/status")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data) {
+          setFacilityStatus(data.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const selectedFacilityObj = useMemo(() => {
+    if (!form.facility) return null;
+    return facilitiesList.find((f) => f.name === form.facility) || {
+      name: form.facility,
+      block: "Madhubani",
+      type: "Facility",
+      tag: "Verified Healthcare Facility",
+      icon: "🏥",
+    };
+  }, [form.facility, facilitiesList]);
+
+  const [uploadingDocs, setUploadingDocs] = useState({
+    child: false,
+    mother: false,
+    father: false,
+    informant: false,
+  });
+
+  const handleUploadingDocChange = (key, loading) => {
+    setUploadingDocs((prev) => {
+      if (prev[key] === Boolean(loading)) return prev;
+      return { ...prev, [key]: Boolean(loading) };
+    });
+  };
+
   const update = (section, field, value) => {
     setForm((prev) => {
       const updatedSection = { ...prev[section], [field]: value };
@@ -289,13 +443,13 @@ function ApplyFormContent({ facParam }) {
 
       let updatedProvider = prev.informationProvider;
 
-      // Automatically mirror contact details to informant if relation matches
+      // Automatically mirror contact details & Aadhaar document to informant if relation matches
       const rel = prev.informationProvider.relationToChild || "";
       if (
         (section === "father" && rel.startsWith("Father")) ||
         (section === "mother" && rel.startsWith("Mother"))
       ) {
-        if (["name", "mobileNumber", "email", "adharNumber"].includes(field)) {
+        if (["name", "mobileNumber", "email", "adharNumber", "adharCardUrl"].includes(field)) {
           updatedProvider = {
             ...updatedProvider,
             [field]: value,
@@ -352,6 +506,7 @@ function ApplyFormContent({ facParam }) {
           mobileNumber: prev.father.mobileNumber || "",
           email: prev.father.email || "",
           adharNumber: prev.father.adharNumber || "",
+          adharCardUrl: prev.father.adharCardUrl || "",
         };
       } else if (newRelation.startsWith("Mother")) {
         updatedProvider = {
@@ -360,6 +515,17 @@ function ApplyFormContent({ facParam }) {
           mobileNumber: prev.mother.mobileNumber || "",
           email: prev.mother.email || "",
           adharNumber: prev.mother.adharNumber || "",
+          adharCardUrl: prev.mother.adharCardUrl || "",
+        };
+      } else {
+        // Clear informant fields for Guardian, Relative, Hospital Authority, Other, etc.
+        updatedProvider = {
+          ...updatedProvider,
+          name: "",
+          mobileNumber: "",
+          email: "",
+          adharNumber: "",
+          adharCardUrl: "",
         };
       }
 
@@ -593,6 +759,16 @@ function ApplyFormContent({ facParam }) {
       }
     }
 
+    if (Object.values(uploadingDocs).some(Boolean)) {
+      setError("कृपया आधार दस्तावेज़ अपलोड पूरा होने की प्रतीक्षा करें (Please wait for all Aadhaar uploads to finish before submitting).");
+      return;
+    }
+
+    if (form.facility && facilityStatus[form.facility]?.isActive === false) {
+      setError("इस स्वास्थ्य केंद्र की सत्यापन इकाई को ऑपरेटर सेंट्रल द्वारा निष्क्रिय (Inactive) किया गया है। वर्तमान में इस केंद्र के लिए नया आवेदन स्वीकार्य नहीं है। कृपया सक्रिय स्वास्थ्य केंद्र चुनें।");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -605,6 +781,7 @@ function ApplyFormContent({ facParam }) {
           dateOfBirth: form.child.dateOfBirth,
           gender: form.child.gender,
           adharNumber: form.child.adharNumber || undefined,
+          adharCardUrl: form.child.adharCardUrl || undefined,
           weight: form.child.weight ? Number(form.child.weight) : undefined,
           deliveryAttention: form.child.deliveryAttention,
           deliveryMethod: form.child.deliveryMethod,
@@ -627,8 +804,14 @@ function ApplyFormContent({ facParam }) {
               : form.birthPlaceAddress,
         },
         parents: {
-          mother: form.mother,
-          father: form.father,
+          mother: {
+            ...form.mother,
+            adharCardUrl: form.mother.adharCardUrl || undefined,
+          },
+          father: {
+            ...form.father,
+            adharCardUrl: form.father.adharCardUrl || undefined,
+          },
           address: form.address,
           permanentAddress: pAddress,
         },
@@ -636,6 +819,7 @@ function ApplyFormContent({ facParam }) {
           name: form.informationProvider.name,
           relationToChild: form.informationProvider.relationToChild,
           adharNumber: form.informationProvider.adharNumber,
+          adharCardUrl: form.informationProvider.adharCardUrl || undefined,
           mobileNumber: form.informationProvider.mobileNumber,
           email: form.informationProvider.email,
           providedInformation: true,
@@ -949,30 +1133,642 @@ function ApplyFormContent({ facParam }) {
             hint="Select the authorized Madhubani healthcare facility where delivery occurred"
             required
           >
-            <select
-              suppressHydrationWarning
-              style={inputStyle}
+            {selectedFacilityObj && form.facility ? (
+              <div
+                style={{
+                  background: "#f0f9ff",
+                  border: "1.5px solid #0284c7",
+                  borderRadius: 12,
+                  padding: "16px 18px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                    <div
+                      style={{
+                        fontSize: 24,
+                        width: 44,
+                        height: 44,
+                        borderRadius: 10,
+                        background: "#e0f2fe",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {selectedFacilityObj.icon || "🏥"}
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                            background: selectedFacilityObj.badgeBg || "#ecfdf5",
+                            color: selectedFacilityObj.badgeColor || "#065f46",
+                            border: `1px solid ${selectedFacilityObj.badgeBorder || "#a7f3d0"}`,
+                          }}
+                        >
+                          {selectedFacilityObj.tag || selectedFacilityObj.type || "Healthcare Facility"}
+                        </span>
+                        {facilityStatus[form.facility]?.isActive === false ? (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "#dc2626",
+                              background: "#fef2f2",
+                              border: "1px solid #fecaca",
+                              padding: "2px 8px",
+                              borderRadius: 99,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            ⚠️ सत्यापन इकाई निष्क्रिय (Suspended)
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: "#16a34a",
+                              background: "#f0fdf4",
+                              border: "1px solid #bbf7d0",
+                              padding: "2px 8px",
+                              borderRadius: 99,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 5,
+                            }}
+                          >
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#16a34a" }} />
+                            सत्यापन इकाई सक्रिय (Active)
+                          </span>
+                        )}
+                      </div>
+                      <h4 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", margin: 0, lineHeight: 1.3 }}>
+                        {selectedFacilityObj.name}
+                      </h4>
+                      <div style={{ fontSize: 12.5, color: "#475569", marginTop: 4 }}>
+                        <span>📍 ब्लॉक (Block): <strong>{selectedFacilityObj.block}</strong></span>
+                        {selectedFacilityObj.pin && <span> • पिन कोड (PIN): <strong>{selectedFacilityObj.pin}</strong></span>}
+                        {selectedFacilityObj.address && <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}>{selectedFacilityObj.address}</div>}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm((p) => ({ ...p, facility: "" }));
+                      setFacilitySearch("");
+                      setFacilityDropdownOpen(true);
+                    }}
+                    style={{
+                      background: "white",
+                      border: "1.5px solid #cbd5e1",
+                      borderRadius: 8,
+                      padding: "8px 14px",
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      color: "#1e40af",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    <X size={14} />
+                    <span>अस्पताल बदलें (Change Hospital)</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div ref={facilityDropdownRef} data-lenis-prevent="true" style={{ width: "100%" }}>
+                {/* Search Bar & Optional Block Filter */}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <div style={{ position: "relative", flex: 1, minWidth: 260 }}>
+                    <Search
+                      size={17}
+                      color="#64748b"
+                      style={{
+                        position: "absolute",
+                        left: 14,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        pointerEvents: "none",
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="अस्पताल का नाम सीधे टाइप करें (Type hospital name e.g. Sadar, Babubarhi, HSC Pastan)..."
+                      value={facilitySearch}
+                      onChange={(e) => {
+                        setFacilitySearch(e.target.value);
+                        setFacilityDropdownOpen(true);
+                      }}
+                      onFocus={() => setFacilityDropdownOpen(true)}
+                      style={{
+                        ...inputStyle,
+                        paddingLeft: 42,
+                        paddingRight: facilitySearch ? 36 : 14,
+                        borderColor: facilityDropdownOpen ? "#2563eb" : "#cbd5e1",
+                        boxShadow: facilityDropdownOpen ? "0 0 0 3px rgba(37,99,235,0.12)" : "none",
+                      }}
+                    />
+                    {facilitySearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFacilitySearch("");
+                        }}
+                        style={{
+                          position: "absolute",
+                          right: 12,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          background: "none",
+                          border: "none",
+                          color: "#94a3b8",
+                          cursor: "pointer",
+                          padding: 4,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        title="सर्च साफ़ करें (Clear search)"
+                      >
+                        <X size={15} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Quick Block Filter Dropdown */}
+                  <div style={{ width: "clamp(160px, 25%, 220px)" }}>
+                    <select
+                      value={facilityBlockFilter}
+                      onChange={(e) => {
+                        setFacilityBlockFilter(e.target.value);
+                        setFacilityDropdownOpen(true);
+                      }}
+                      style={{
+                        ...inputStyle,
+                        cursor: "pointer",
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: facilityBlockFilter === "ALL" ? "#475569" : "#1e40af",
+                        background: facilityBlockFilter === "ALL" ? "#f8fafc" : "#eff6ff",
+                      }}
+                    >
+                      <option value="ALL">सभी 21 ब्लॉक (All Blocks)</option>
+                      {allFacilityBlocks.map((b) => (
+                        <option key={b} value={b}>
+                          📍 {b} Block
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Sub-bar: Status count & Open / Close toggle button */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginTop: 8,
+                    fontSize: 12.5,
+                    color: "#64748b",
+                    flexWrap: "wrap",
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    {facilityBlockFilter !== "ALL" && (
+                      <button
+                        type="button"
+                        onClick={() => setFacilityBlockFilter("ALL")}
+                        style={{
+                          background: "#eff6ff",
+                          border: "1px solid #bfdbfe",
+                          borderRadius: 99,
+                          padding: "2px 8px",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#1e40af",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <span>📍 {facilityBlockFilter}</span>
+                        <X size={12} />
+                      </button>
+                    )}
+                    <span>
+                      {facilitySearch || facilityBlockFilter !== "ALL" ? (
+                        <span>
+                          <strong>{filteredSearchFacilities.length}</strong> अस्पताल मिले (
+                          {filteredSearchFacilities.length === 1 ? "1 facility match" : `${filteredSearchFacilities.length} facilities match`}
+                          {facilitySearch ? ` for "${facilitySearch}"` : ""}
+                          {facilityBlockFilter !== "ALL" ? ` in ${facilityBlockFilter}` : ""}
+                          )
+                        </span>
+                      ) : (
+                        <span>कुल <strong>{facilitiesList.length}</strong> अधिकृत अस्पताल उपलब्ध (Total <strong>{facilitiesList.length}</strong> facilities available in Madhubani District)</span>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Dedicated Open/Close Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={() => setFacilityDropdownOpen((prev) => !prev)}
+                    style={{
+                      background: facilityDropdownOpen ? "#fef2f2" : "#eff6ff",
+                      color: facilityDropdownOpen ? "#b91c1c" : "#1d4ed8",
+                      border: facilityDropdownOpen ? "1px solid #fecaca" : "1px solid #bfdbfe",
+                      borderRadius: 8,
+                      padding: "5px 12px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {facilityDropdownOpen ? (
+                      <>
+                        <ChevronUp size={14} />
+                        <span>सूची बंद करें (Close List)</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown size={14} />
+                        <span>अस्पताल सूची खोलें (Open List)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* IN-FLOW Facility List Panel - Enclosed completely inside Section 1 card */}
+                {facilityDropdownOpen && (
+                  <div
+                    data-lenis-prevent="true"
+                    onWheel={(e) => e.stopPropagation()}
+                    style={{
+                      marginTop: 12,
+                      width: "100%",
+                      background: "#ffffff",
+                      borderRadius: 12,
+                      border: "1.5px solid #cbd5e1",
+                      boxShadow: "0 4px 16px rgba(0, 0, 0, 0.05)",
+                      overflow: "hidden",
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                  >
+                    {/* Sticky List Header */}
+                    <div
+                      data-lenis-prevent="true"
+                      onWheel={(e) => {
+                        e.stopPropagation();
+                        if (facilityListScrollRef.current) {
+                          facilityListScrollRef.current.scrollTop += e.deltaY;
+                        }
+                      }}
+                      style={{
+                        position: "sticky",
+                        top: 0,
+                        background: "#f8fafc",
+                        borderBottom: "1px solid #e2e8f0",
+                        padding: "10px 16px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        zIndex: 5,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "#1e293b" }}>
+                          📋 अधिकृत अस्पताल सूची ({filteredSearchFacilities.length} उपलब्ध)
+                        </span>
+                        {facilityBlockFilter !== "ALL" && (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              background: "#dbeafe",
+                              color: "#1e40af",
+                              padding: "1px 8px",
+                              borderRadius: 99,
+                            }}
+                          >
+                            {facilityBlockFilter} Block
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFacilityDropdownOpen(false)}
+                        style={{
+                          background: "linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)",
+                          border: "1px solid #fca5a5",
+                          borderRadius: 6,
+                          padding: "4px 10px",
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          color: "#b91c1c",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          boxShadow: "0 1px 3px rgba(185, 28, 28, 0.2), inset 0 1px 0 rgba(255,255,255,0.4)",
+                          letterSpacing: "0.01em",
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = "linear-gradient(135deg, #fecaca 0%, #fca5a5 100%)";
+                          e.currentTarget.style.boxShadow = "0 2px 6px rgba(185, 28, 28, 0.3), inset 0 1px 0 rgba(255,255,255,0.3)";
+                          e.currentTarget.style.transform = "translateY(-1px)";
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = "linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)";
+                          e.currentTarget.style.boxShadow = "0 1px 3px rgba(185, 28, 28, 0.2), inset 0 1px 0 rgba(255,255,255,0.4)";
+                          e.currentTarget.style.transform = "translateY(0)";
+                        }}
+                        onMouseDown={e => {
+                          e.currentTarget.style.transform = "translateY(0px) scale(0.97)";
+                          e.currentTarget.style.boxShadow = "0 1px 2px rgba(185, 28, 28, 0.2)";
+                        }}
+                        onMouseUp={e => {
+                          e.currentTarget.style.transform = "translateY(-1px)";
+                        }}
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+
+                    {/* Scrollable Results List Body */}
+                    <div
+                      ref={facilityListScrollRef}
+                      data-lenis-prevent="true"
+                      onWheel={(e) => {
+                        e.stopPropagation();
+                      }}
+                      style={{
+                        maxHeight: 380,
+                        overflowY: "auto",
+                        overscrollBehavior: "contain",
+                        WebkitOverflowScrolling: "touch",
+                        touchAction: "pan-y",
+                        scrollbarWidth: "thin",
+                        scrollbarColor: "#94a3b8 #f1f5f9",
+                      }}
+                    >
+                      {filteredSearchFacilities.length === 0 ? (
+                        <div style={{ padding: "32px 20px", textAlign: "center", color: "#64748b" }}>
+                          <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
+                          <div style={{ fontWeight: 600, color: "#1e293b", fontSize: 14 }}>
+                            कोई अस्पताल नहीं मिला (No facility found)
+                          </div>
+                          <div style={{ fontSize: 12.5, marginTop: 4 }}>
+                            {facilitySearch ? (
+                              <span>&ldquo;{facilitySearch}&rdquo; से मेल खाता कोई केंद्र नहीं मिला। </span>
+                            ) : (
+                              <span>चयनित ब्लॉक में कोई अस्पताल उपलब्ध नहीं है। </span>
+                            )}
+                            कृपया स्पेलिंग जांचें या ब्लॉक फिल्टर बदलें।
+                          </div>
+                          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 14, flexWrap: "wrap" }}>
+                            {facilitySearch && (
+                              <button
+                                type="button"
+                                onClick={() => setFacilitySearch("")}
+                                style={{
+                                  padding: "6px 14px",
+                                  background: "#f1f5f9",
+                                  color: "#334155",
+                                  border: "1px solid #cbd5e1",
+                                  borderRadius: 6,
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                सर्च साफ़ करें (Clear Search)
+                              </button>
+                            )}
+                            {facilityBlockFilter !== "ALL" && (
+                              <button
+                                type="button"
+                                onClick={() => setFacilityBlockFilter("ALL")}
+                                style={{
+                                  padding: "6px 14px",
+                                  background: "#eff6ff",
+                                  color: "#1d4ed8",
+                                  border: "1px solid #bfdbfe",
+                                  borderRadius: 6,
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                सभी 21 ब्लॉक देखें (All Blocks)
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          {filteredSearchFacilities.map((fac) => {
+                            const facName = fac.name;
+                            const isInactive = facilityStatus[facName]?.isActive === false;
+                            return (
+                              <div
+                                key={facName}
+                                onClick={() => {
+                                  if (isInactive) return;
+                                  setForm((p) => ({
+                                    ...p,
+                                    facility: facName,
+                                    child: {
+                                      ...p.child,
+                                      placeOfBirth: "Hospital",
+                                    },
+                                  }));
+                                  setFacilityDropdownOpen(false);
+                                  setFacilitySearch("");
+                                }}
+                                style={{
+                                  padding: "11px 16px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  gap: 12,
+                                  borderBottom: "1px solid #f1f5f9",
+                                  cursor: isInactive ? "not-allowed" : "pointer",
+                                  opacity: isInactive ? 0.6 : 1,
+                                  background: isInactive ? "#fafafa" : "#ffffff",
+                                  transition: "background 0.15s",
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isInactive) e.currentTarget.style.background = "#f0f9ff";
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isInactive) e.currentTarget.style.background = "#ffffff";
+                                }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                                  <span style={{ fontSize: 20, flexShrink: 0 }}>{fac.icon || "🏥"}</span>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                      <span
+                                        style={{
+                                          fontSize: 10,
+                                          fontWeight: 700,
+                                          padding: "1px 6px",
+                                          borderRadius: 4,
+                                          background: fac.badgeBg || "#eff6ff",
+                                          color: fac.badgeColor || "#1e40af",
+                                          border: `1px solid ${fac.badgeBorder || "#bfdbfe"}`,
+                                        }}
+                                      >
+                                        {fac.tag || fac.type || "HSC"}
+                                      </span>
+                                      <strong style={{ fontSize: 13.5, color: "#0f172a" }}>{facName}</strong>
+                                    </div>
+                                    <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}>
+                                      📍 <strong>{fac.block}</strong> Block {fac.pin ? `• PIN: ${fac.pin}` : ""}
+                                      {fac.address && fac.address !== facName ? ` • ${fac.address.slice(0, 55)}` : ""}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div style={{ flexShrink: 0, textAlign: "right" }}>
+                                  {isInactive ? (
+                                    <span
+                                      style={{
+                                        fontSize: 10.5,
+                                        fontWeight: 700,
+                                        color: "#dc2626",
+                                        background: "#fef2f2",
+                                        border: "1px solid #fecaca",
+                                        padding: "2px 7px",
+                                        borderRadius: 99,
+                                      }}
+                                    >
+                                      ⚠️ Suspended
+                                    </span>
+                                  ) : (
+                                    <span
+                                      style={{
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        color: "#2563eb",
+                                        background: "#eff6ff",
+                                        border: "1px solid #dbeafe",
+                                        padding: "4px 10px",
+                                        borderRadius: 6,
+                                      }}
+                                    >
+                                      चुनें (Select)
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Sticky List Footer */}
+                    <div
+                      data-lenis-prevent="true"
+                      onWheel={(e) => {
+                        e.stopPropagation();
+                        if (facilityListScrollRef.current) {
+                          facilityListScrollRef.current.scrollTop += e.deltaY;
+                        }
+                      }}
+                      style={{
+                        position: "sticky",
+                        bottom: 0,
+                        background: "#f8fafc",
+                        borderTop: "1px solid #e2e8f0",
+                        padding: "8px 16px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        fontSize: 12,
+                        color: "#64748b",
+                        zIndex: 5,
+                      }}
+                    >
+                      <span>
+                        दिखाए जा रहे हैं: <strong>{filteredSearchFacilities.length}</strong> / <strong>{facilitiesList.length}</strong> अस्पताल
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Hidden input for HTML form validation */}
+            <input
+              type="text"
+              name="facility_validator"
               value={form.facility}
-              onChange={(e) => {
-                const fac = e.target.value;
-                setForm((p) => ({
-                  ...p,
-                  facility: fac,
-                  child: {
-                    ...p.child,
-                    placeOfBirth: fac ? "Hospital" : p.child.placeOfBirth,
-                  },
-                }));
-              }}
+              onChange={() => {}}
               required
-            >
-              <option value="">— Select Authorized Facility —</option>
-              {FACILITIES.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
+              style={{
+                opacity: 0,
+                height: 0,
+                width: 0,
+                padding: 0,
+                margin: 0,
+                border: "none",
+                position: "absolute",
+                pointerEvents: "none",
+              }}
+              tabIndex={-1}
+            />
+
+            {form.facility && facilityStatus[form.facility]?.isActive === false && (
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: "10px 14px",
+                  background: "#fef2f2",
+                  border: "1.5px solid #fecaca",
+                  borderRadius: 8,
+                  color: "#dc2626",
+                  fontSize: 13,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                }}
+              >
+                <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>सत्यापन इकाई निष्क्रिय (Facility Suspended):</strong> ऑपरेटर सेंट्रल द्वारा इस अस्पताल की सत्यापन इकाई को निष्क्रिय किया गया है। वर्तमान में इस केंद्र के लिए नया आवेदन स्वीकार्य नहीं है। कृपया &ldquo;अस्पताल बदलें&rdquo; पर क्लिक करके दूसरा अस्पताल चुनें।
+                </span>
+              </div>
+            )}
           </Field>
         </div>
 
@@ -1026,51 +1822,65 @@ function ApplyFormContent({ facParam }) {
               />
             </Field>
 
-            <Field label="लिंग (Gender)" required>
-              <select
-                suppressHydrationWarning
-                style={inputStyle}
-                value={form.child.gender}
-                onChange={(e) => update("child", "gender", e.target.value)}
+            {/* Left Column: Gender and Place of Birth placed directly one below the other */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <Field label="लिंग (Gender)" required>
+                <select
+                  suppressHydrationWarning
+                  style={inputStyle}
+                  value={form.child.gender}
+                  onChange={(e) => update("child", "gender", e.target.value)}
+                  required
+                >
+                  <option value="">— Select Gender —</option>
+                  <option value="Male">पुरुष (Male)</option>
+                  <option value="Female">महिला (Female)</option>
+                  <option value="Transgender">ट्रांसजेंडर व्यक्ति (Transgender)</option>
+                </select>
+              </Field>
+
+              <Field
+                label="जन्म का स्थान (Place of Birth)"
+                hint={form.facility && form.child.placeOfBirth === "Hospital" ? `अस्पताल चयन के अनुसार स्वतः चयनित (${form.facility})` : undefined}
                 required
               >
-                <option value="">— Select Gender —</option>
-                <option value="Male">पुरुष (Male)</option>
-                <option value="Female">महिला (Female)</option>
-                <option value="Transgender">ट्रांसजेंडर व्यक्ति (Transgender)</option>
-              </select>
-            </Field>
+                <select
+                  suppressHydrationWarning
+                  style={inputStyle}
+                  value={form.child.placeOfBirth}
+                  onChange={(e) => update("child", "placeOfBirth", e.target.value)}
+                  required
+                >
+                  <option value="Hospital">1. अस्पताल / संस्थान (Hospital / Institution)</option>
+                  <option value="Home">2. घर (Home)</option>
+                  <option value="Other">3. अन्य स्थान (Other Place)</option>
+                </select>
+              </Field>
+            </div>
 
-            <Field
-              label="शिशु की आधार संख्या (Child's Aadhaar Number)"
-              hint="यदि उपलब्ध हो (If available: XXXX-XXXX-XXXX)"
-            >
-              <input
-                style={inputStyle}
-                placeholder="XXXX-XXXX-XXXX (Optional)"
-                maxLength={14}
-                value={form.child.adharNumber}
-                onChange={(e) => handleAadhaarChange("child", "adharNumber", e.target.value, form.child.adharNumber)}
+            {/* Right Column: Child's Aadhaar Number & Aadhaar Upload */}
+            <div>
+              <Field
+                label="शिशु की आधार संख्या (Child's Aadhaar Number)"
+                hint="यदि उपलब्ध हो (If available: XXXX-XXXX-XXXX)"
+              >
+                <input
+                  style={inputStyle}
+                  placeholder="XXXX-XXXX-XXXX (Optional)"
+                  maxLength={14}
+                  value={form.child.adharNumber}
+                  onChange={(e) => handleAadhaarChange("child", "adharNumber", e.target.value, form.child.adharNumber)}
+                />
+              </Field>
+              <AadhaarUpload
+                label="शिशु का आधार कार्ड (Child's Aadhaar Card)"
+                hint="यदि शिशु का आधार उपलब्ध हो • PDF, JPG, PNG • अधिकतम 1MB, केवल 1 फ़ाइल"
+                holder="child"
+                value={form.child.adharCardUrl}
+                onChange={(url) => update("child", "adharCardUrl", url || "")}
+                onUploadingChange={(loading) => handleUploadingDocChange("child", loading)}
               />
-            </Field>
-
-            <Field
-              label="जन्म का स्थान (Place of Birth)"
-              hint={form.facility && form.child.placeOfBirth === "Hospital" ? `अस्पताल चयन के अनुसार स्वतः चयनित (${form.facility})` : undefined}
-              required
-            >
-              <select
-                suppressHydrationWarning
-                style={inputStyle}
-                value={form.child.placeOfBirth}
-                onChange={(e) => update("child", "placeOfBirth", e.target.value)}
-                required
-              >
-                <option value="Hospital">1. अस्पताल / संस्थान (Hospital / Institution)</option>
-                <option value="Home">2. घर (Home)</option>
-                <option value="Other">3. अन्य स्थान (Other Place)</option>
-              </select>
-            </Field>
+            </div>
           </Grid>
 
           {/* If Home or Other place of birth */}
@@ -1290,33 +2100,36 @@ function ApplyFormContent({ facParam }) {
                 required
               />
             </Field>
-            <Field
-              label="माता की आधार संख्या (Mother's Aadhaar Number)"
-              hint="अनिवार्य 12-अंक (Mandatory 12-digit: XXXX-XXXX-XXXX)"
-              required
-            >
-              <input
-                style={inputStyle}
-                placeholder="XXXX-XXXX-XXXX"
-                maxLength={14}
-                value={form.mother.adharNumber}
-                onChange={(e) => handleAadhaarChange("mother", "adharNumber", e.target.value, form.mother.adharNumber)}
+            <div>
+              <Field
+                label="माता की आधार संख्या (Mother's Aadhaar Number)"
+                hint="अनिवार्य 12-अंक (Mandatory 12-digit: XXXX-XXXX-XXXX)"
                 required
-                pattern="[0-9]{4}-[0-9]{4}-[0-9]{4}"
-                title="कृपया माता की 12-अंकों की आधार संख्या (XXXX-XXXX-XXXX) दर्ज करें"
+              >
+                <input
+                  style={inputStyle}
+                  placeholder="XXXX-XXXX-XXXX"
+                  maxLength={14}
+                  value={form.mother.adharNumber}
+                  onChange={(e) => handleAadhaarChange("mother", "adharNumber", e.target.value, form.mother.adharNumber)}
+                  required
+                  pattern="[0-9]{4}-[0-9]{4}-[0-9]{4}"
+                  title="कृपया माता की 12-अंकों की आधार संख्या (XXXX-XXXX-XXXX) दर्ज करें"
+                />
+              </Field>
+              <AadhaarUpload
+                label="माता का आधार कार्ड अपलोड करें (Upload Mother's Aadhaar Card)"
+                hint="PDF, JPG, PNG • अधिकतम 1 MB, केवल 1 फ़ाइल"
+                holder="mother"
+                value={form.mother.adharCardUrl}
+                onChange={(url) => update("mother", "adharCardUrl", url || "")}
+                onUploadingChange={(loading) => handleUploadingDocChange("mother", loading)}
               />
-            </Field>
+            </div>
             <Field label="ईमेल आई० डी० (Email ID)" hint={renderEmailHint(form.mother.email, false)}>
               <input
                 type="email"
-                style={{
-                  ...inputStyle,
-                  borderColor: form.mother.email
-                    ? isValidEmail(form.mother.email)
-                      ? "#16a34a"
-                      : "#ef4444"
-                    : undefined,
-                }}
+                style={inputStyle}
                 placeholder="mother@example.com"
                 value={form.mother.email}
                 onChange={(e) => update("mother", "email", e.target.value)}
@@ -1373,33 +2186,36 @@ function ApplyFormContent({ facParam }) {
                 required
               />
             </Field>
-            <Field
-              label="पिता की आधार संख्या (Father's Aadhaar Number)"
-              hint="अनिवार्य 12-अंक (Mandatory 12-digit: XXXX-XXXX-XXXX)"
-              required
-            >
-              <input
-                style={inputStyle}
-                placeholder="XXXX-XXXX-XXXX"
-                maxLength={14}
-                value={form.father.adharNumber}
-                onChange={(e) => handleAadhaarChange("father", "adharNumber", e.target.value, form.father.adharNumber)}
+            <div>
+              <Field
+                label="पिता की आधार संख्या (Father's Aadhaar Number)"
+                hint="अनिवार्य 12-अंक (Mandatory 12-digit: XXXX-XXXX-XXXX)"
                 required
-                pattern="[0-9]{4}-[0-9]{4}-[0-9]{4}"
-                title="कृपया पिता की 12-अंकों की आधार संख्या (XXXX-XXXX-XXXX) दर्ज करें"
+              >
+                <input
+                  style={inputStyle}
+                  placeholder="XXXX-XXXX-XXXX"
+                  maxLength={14}
+                  value={form.father.adharNumber}
+                  onChange={(e) => handleAadhaarChange("father", "adharNumber", e.target.value, form.father.adharNumber)}
+                  required
+                  pattern="[0-9]{4}-[0-9]{4}-[0-9]{4}"
+                  title="कृपया पिता की 12-अंकों की आधार संख्या (XXXX-XXXX-XXXX) दर्ज करें"
+                />
+              </Field>
+              <AadhaarUpload
+                label="पिता का आधार कार्ड अपलोड करें (Upload Father's Aadhaar Card)"
+                hint="PDF, JPG, PNG • अधिकतम 1 MB, केवल 1 फ़ाइल"
+                holder="father"
+                value={form.father.adharCardUrl}
+                onChange={(url) => update("father", "adharCardUrl", url || "")}
+                onUploadingChange={(loading) => handleUploadingDocChange("father", loading)}
               />
-            </Field>
+            </div>
             <Field label="ईमेल आई० डी० (Email ID)" hint={renderEmailHint(form.father.email, false)}>
               <input
                 type="email"
-                style={{
-                  ...inputStyle,
-                  borderColor: form.father.email
-                    ? isValidEmail(form.father.email)
-                      ? "#16a34a"
-                      : "#ef4444"
-                    : undefined,
-                }}
+                style={inputStyle}
                 placeholder="father@example.com"
                 value={form.father.email}
                 onChange={(e) => update("father", "email", e.target.value)}
@@ -2045,7 +2861,6 @@ function ApplyFormContent({ facParam }) {
           <Grid>
             <Field
               label="शिशु से सम्बन्ध (Relation to Child)"
-              hint="पिता या माता चुनने पर ऊपर से विवरणी स्वतः भर जाएगी (Auto-populates from Father/Mother)"
               required
             >
               <select
@@ -2092,14 +2907,7 @@ function ApplyFormContent({ facParam }) {
             >
               <input
                 type="email"
-                style={{
-                  ...inputStyle,
-                  borderColor: form.informationProvider.email
-                    ? isValidEmail(form.informationProvider.email)
-                      ? "#16a34a"
-                      : "#ef4444"
-                    : undefined,
-                }}
+                style={inputStyle}
                 placeholder="applicant@example.com"
                 value={form.informationProvider.email}
                 onChange={(e) => update("informationProvider", "email", e.target.value)}
@@ -2107,18 +2915,28 @@ function ApplyFormContent({ facParam }) {
               />
             </Field>
 
-            <Field
-              label="सूचनादाता की आधार संख्या (Aadhaar Number)"
-              hint="यदि उपलब्ध हो (If available: XXXX-XXXX-XXXX)"
-            >
-              <input
-                style={inputStyle}
-                placeholder="XXXX-XXXX-XXXX (Optional)"
-                maxLength={14}
-                value={form.informationProvider.adharNumber}
-                onChange={(e) => handleAadhaarChange("informationProvider", "adharNumber", e.target.value, form.informationProvider.adharNumber)}
+            <div>
+              <Field
+                label="सूचनादाता की आधार संख्या (Aadhaar Number)"
+                hint="यदि उपलब्ध हो (If available: XXXX-XXXX-XXXX)"
+              >
+                <input
+                  style={inputStyle}
+                  placeholder="XXXX-XXXX-XXXX (Optional)"
+                  maxLength={14}
+                  value={form.informationProvider.adharNumber}
+                  onChange={(e) => handleAadhaarChange("informationProvider", "adharNumber", e.target.value, form.informationProvider.adharNumber)}
+                />
+              </Field>
+              <AadhaarUpload
+                label="सूचनादाता का आधार कार्ड अपलोड करें (Upload Informant's Aadhaar Card)"
+                hint="PDF, JPG, PNG • अधिकतम 1 MB, केवल 1 फ़ाइल"
+                holder="informant"
+                value={form.informationProvider.adharCardUrl}
+                onChange={(url) => update("informationProvider", "adharCardUrl", url || "")}
+                onUploadingChange={(loading) => handleUploadingDocChange("informant", loading)}
               />
-            </Field>
+            </div>
           </Grid>
 
           {/* Statutory Declaration Card */}

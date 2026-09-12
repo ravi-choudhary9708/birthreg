@@ -1,10 +1,12 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import gsap from "gsap";
 
 export default function TrackPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [step, setStep] = useState("APP_NUMBER"); // "APP_NUMBER" | "OTP"
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
@@ -30,7 +32,9 @@ export default function TrackPage() {
       const params = new URLSearchParams(window.location.search);
       const appParam = params.get("app");
       if (appParam) {
-        setValue(appParam.trim().toUpperCase());
+        queueMicrotask(() => {
+          setValue(appParam.trim().toUpperCase());
+        });
       }
     }
   }, []);
@@ -336,6 +340,56 @@ export default function TrackPage() {
       background: #f8fafc;
       color: #1e40af;
     }
+
+    /* Responsive Navigation */
+    .desktop-nav {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .mobile-menu-btn {
+      display: none;
+      background: transparent;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 20px;
+      line-height: 1;
+      color: #374151;
+      cursor: pointer;
+    }
+    .mobile-nav-drawer {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      padding: 14px 0 16px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .nav-link {
+      transition: background 0.2s, color 0.2s;
+      text-decoration: none;
+    }
+    .nav-link:hover {
+      background: #f1f5f9;
+      color: #1e40af !important;
+    }
+
+    @media (max-width: 768px) {
+      .desktop-nav {
+        display: none !important;
+      }
+      .mobile-menu-btn {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+      }
+      .mobile-nav-drawer.open {
+        display: flex !important;
+      }
+      .header-subtext {
+        display: none;
+      }
+    }
   `;
 
   return (
@@ -350,102 +404,209 @@ export default function TrackPage() {
     >
       <style>{styles}</style>
 
-      {/* Header */}
-      <div
+      {/* Sticky Header / Navbar */}
+      <header
         className="anim-track-header"
         style={{
-          background: "white",
           borderBottom: "1px solid #e5e7eb",
-          padding: "12px 16px",
+          padding: "0 16px",
+          position: "sticky",
+          top: 0,
+          background: "rgba(255,255,255,0.96)",
+          backdropFilter: "blur(12px)",
+          zIndex: 100,
         }}
       >
         <div
           style={{
-            maxWidth: 700,
+            maxWidth: 1200,
             margin: "0 auto",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 10,
+            minHeight: 64,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* Government of Bihar Emblem */}
             <Link
               href="/"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                textDecoration: "none",
-              }}
+              style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0 }}
+              title="Government of Bihar"
             >
-              <div
+              <img
+                src="/bihar_government.webp"
+                alt="Government of Bihar Seal"
                 style={{
-                  width: 38,
-                  height: 38,
-                  background: "#eff6ff",
-                  borderRadius: 10,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: "1px solid #bfdbfe",
+                  height: 42,
+                  width: "auto",
+                  maxHeight: 42,
+                  objectFit: "contain",
+                  display: "block",
                 }}
-              >
-                <img
-                  src="/baby_birth.svg"
-                  alt="Government of Bihar Emblem"
-                  style={{ width: 28, height: 28, objectFit: "contain" }}
-                />
-              </div>
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/logo.png";
+                }}
+              />
+            </Link>
+
+            {/* Vertical Divider */}
+            <div
+              style={{
+                width: 1,
+                height: 36,
+                backgroundColor: "#d1d5db",
+                flexShrink: 0,
+              }}
+              aria-hidden="true"
+            />
+
+            {/* Birth Portal Logo & Title */}
+            <Link
+              href="/"
+              style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}
+            >
+              <Image
+                src="/baby_birth.svg"
+                alt="Birth Certificate Portal Logo"
+                width={38}
+                height={38}
+                priority
+                loading="eager"
+                style={{ objectFit: "contain", flexShrink: 0 }}
+              />
               <div>
-                <p
+                <div
                   style={{
-                    color: "#1e40af",
                     fontWeight: 700,
-                    fontSize: 14,
+                    fontSize: 15,
+                    color: "#111827",
                     lineHeight: 1.2,
                   }}
                 >
-                  District Administration
-                </p>
-                <p style={{ color: "#6b7280", fontSize: 11 }}>
-                  Civil Registration System • Madhubani
-                </p>
+                  Birth Certificate Portal
+                </div>
+                <div
+                  className="header-subtext"
+                  style={{
+                    fontSize: 11,
+                    color: "#6b7280",
+                    fontWeight: 500,
+                  }}
+                >
+                  District Administration Madhubani • Govt. of Bihar
+                </div>
               </div>
             </Link>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Link
-              href="/apply"
-              style={{
-                fontSize: 13,
-                color: "#1e40af",
-                fontWeight: 600,
-                padding: "6px 12px",
-                borderRadius: 6,
-                border: "1px solid #bfdbfe",
-                textDecoration: "none",
-                background: "#eff6ff",
-              }}
-            >
-              Apply Online
-            </Link>
+
+          {/* Desktop Nav */}
+          <nav className="desktop-nav">
             <Link
               href="/"
+              className="nav-link"
               style={{
-                fontSize: 13,
-                color: "#6b7280",
+                padding: "8px 14px",
+                borderRadius: 6,
+                color: "#374151",
+                fontSize: 14,
                 fontWeight: 500,
-                padding: "6px 12px",
-                textDecoration: "none",
               }}
             >
               Home
             </Link>
-          </div>
+            <Link
+              href="/facilities"
+              className="nav-link"
+              style={{
+                padding: "8px 14px",
+                borderRadius: 6,
+                color: "#374151",
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
+              Facility Directory
+            </Link>
+            <Link
+              href="/apply"
+              style={{
+                padding: "8px 18px",
+                background: "#1e40af",
+                color: "white",
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
+                textDecoration: "none",
+                marginLeft: 4,
+              }}
+            >
+              Apply Online
+            </Link>
+          </nav>
+
+          {/* Mobile Hamburger Toggle */}
+          <button
+            type="button"
+            className="mobile-menu-btn"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? "✕" : "☰"}
+          </button>
         </div>
-      </div>
+
+        {/* Mobile Dropdown Drawer */}
+        <div className={`mobile-nav-drawer ${mobileMenuOpen ? "open" : ""}`}>
+          <Link
+            href="/"
+            onClick={() => setMobileMenuOpen(false)}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              color: "#374151",
+              fontSize: 14,
+              fontWeight: 500,
+              textDecoration: "none",
+            }}
+          >
+            Home
+          </Link>
+          <Link
+            href="/facilities"
+            onClick={() => setMobileMenuOpen(false)}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              color: "#374151",
+              fontSize: 14,
+              fontWeight: 500,
+              textDecoration: "none",
+            }}
+          >
+            Facility Directory
+          </Link>
+          <Link
+            href="/apply"
+            onClick={() => setMobileMenuOpen(false)}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: "#1e40af",
+              color: "white",
+              fontSize: 14,
+              fontWeight: 600,
+              textAlign: "center",
+              textDecoration: "none",
+              marginTop: 4,
+            }}
+          >
+            Apply Online
+          </Link>
+        </div>
+      </header>
 
       {/* Main Content */}
       <div
@@ -641,20 +802,6 @@ export default function TrackPage() {
                     "Send 6-Digit OTP to Email →"
                   )}
                 </button>
-
-                <div
-                  style={{
-                    marginTop: 22,
-                    padding: "14px 16px",
-                    background: "#f8fafc",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 10,
-                  }}
-                >
-                  <p style={{ fontSize: 12, color: "#475569", margin: 0, lineHeight: 1.5 }}>
-                    🔐 <strong>Identity Protection:</strong> To ensure sensitive birth records remain confidential, a 6-digit random code will be sent to the email address registered with this application.
-                  </p>
-                </div>
               </form>
             )}
 

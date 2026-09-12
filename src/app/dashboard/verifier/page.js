@@ -22,6 +22,8 @@ import {
   FileCheck,
   Send,
 } from "lucide-react";
+import { getDocumentViewUrl } from "@/utils/documentViewer";
+import { useRefreshSecurity } from "@/hooks/useRefreshSecurity";
 
 const STATUS_COLORS = {
   PENDING_VERIFIER: { bg: "#fffbeb", color: "#d97706", border: "#fde68a", label: "Pending Verification", step: 1 },
@@ -42,7 +44,11 @@ const COMMON_REJECTION_REASONS = [
   "Parent names on ID proof differ from registration details",
 ];
 
+const SLA_DAYS = 7;
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
 export default function VerifierDashboard() {
+  const { isRefreshing } = useRefreshSecurity();
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -68,7 +74,7 @@ export default function VerifierDashboard() {
     try {
       const res = await fetch("/api/admin/applications");
       const data = await res.json();
-      if (res.status === 401) { router.push("/login"); return; }
+      if (res.status === 401) { router.push("/logout?reason=refresh"); return; }
       if (!data.success) throw new Error(data.message);
       const list = Array.isArray(data.data) ? data.data : (data.data?.applications || []);
       setApps(list);
@@ -233,13 +239,11 @@ export default function VerifierDashboard() {
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    router.push("/logout?reason=manual");
   };
 
   // Metrics
   const now = useMemo(() => new Date(), []);
-  const SLA_DAYS = 7;
-  const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
   const metrics = useMemo(() => {
     let pendingVerifier = 0;
@@ -298,6 +302,43 @@ export default function VerifierDashboard() {
       return true;
     });
   }, [apps, activeFilter, searchTerm]);
+
+  if (isRefreshing) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f9fafb",
+          color: "#111827",
+          fontFamily: "'Inter', sans-serif",
+          padding: 20,
+          textAlign: "center",
+        }}
+      >
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            border: "3.5px solid #e5e7eb",
+            borderTopColor: "#1e40af",
+            borderRadius: "50%",
+            animation: "spin 0.8s linear infinite",
+            marginBottom: 16,
+          }}
+        />
+        <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "#111827" }}>
+          सुरक्षा नीति: सत्र समाप्त हो रहा है...
+        </h3>
+        <p style={{ fontSize: 13, color: "#6b7280", margin: "8px 0 0" }}>
+          पृष्ठ रीफ़्रेश करने के कारण लॉग आउट किया जा रहा है (Logging out due to page refresh...)
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} style={{ minHeight: "100vh", background: "#f9fafb" }}>
@@ -615,6 +656,29 @@ export default function VerifierDashboard() {
                           <div style={{ fontSize: 11, color: "#94a3b8" }}>
                             {app.informationProvider?.mobileNumber || "—"}
                           </div>
+                          {Boolean(
+                            app.parents?.mother?.adharCardUrl ||
+                            app.parents?.father?.adharCardUrl ||
+                            app.informationProvider?.adharCardUrl ||
+                            app.child?.adharCardUrl
+                          ) && (
+                            <div style={{ marginTop: 4 }}>
+                              <span style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 3,
+                                fontSize: 10.5,
+                                fontWeight: 600,
+                                background: "#eff6ff",
+                                color: "#1d4ed8",
+                                padding: "2px 6px",
+                                borderRadius: 4,
+                                border: "1px solid #bfdbfe",
+                              }}>
+                                <FileText size={11} /> Aadhaar Attached
+                              </span>
+                            </div>
+                          )}
                         </td>
 
                         {/* 4. Statutory 7-Day SLA Counter */}
@@ -837,8 +901,36 @@ export default function VerifierDashboard() {
                   <div><span style={{ color: "#64748b" }}>Gender:</span> <strong style={{ display: "block" }}>{viewingApp.child?.gender || "—"}</strong></div>
                   <div><span style={{ color: "#64748b" }}>Date of Birth:</span> <strong style={{ display: "block" }}>{viewingApp.child?.dateOfBirth ? new Date(viewingApp.child.dateOfBirth).toLocaleDateString("en-IN") : "—"}</strong></div>
                   <div><span style={{ color: "#64748b" }}>Birth Weight:</span> <strong style={{ display: "block" }}>{viewingApp.child?.weight ? `${viewingApp.child.weight} kg` : "—"}</strong></div>
+                  <div><span style={{ color: "#64748b" }}>Child Aadhaar:</span> <strong style={{ display: "block" }}>{viewingApp.child?.adharNumber || "—"}</strong></div>
                   <div><span style={{ color: "#64748b" }}>Place of Birth:</span> <strong style={{ display: "block" }}>{viewingApp.child?.placeOfBirth || "—"}</strong></div>
                   <div><span style={{ color: "#64748b" }}>Delivery Attention:</span> <strong style={{ display: "block" }}>{viewingApp.child?.deliveryAttention || "—"}</strong></div>
+                  {viewingApp.child?.adharCardUrl && (
+                    <div>
+                      <span style={{ color: "#64748b" }}>Aadhaar Card:</span>
+                      <div style={{ marginTop: 3 }}>
+                        <a
+                          href={getDocumentViewUrl(viewingApp.child.adharCardUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 5,
+                            padding: "3px 8px",
+                            background: "#eff6ff",
+                            border: "1px solid #bfdbfe",
+                            borderRadius: 6,
+                            color: "#1d4ed8",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            textDecoration: "none",
+                          }}
+                        >
+                          <ExternalLink size={12} /> View Document
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -854,6 +946,32 @@ export default function VerifierDashboard() {
                       <div><strong>Name:</strong> {viewingApp.parents?.mother?.name || "—"}</div>
                       <div><strong>Aadhaar:</strong> {viewingApp.parents?.mother?.adharNumber || "—"}</div>
                       <div><strong>Mobile:</strong> {viewingApp.parents?.mother?.mobileNumber || "—"}</div>
+                      <div style={{ marginTop: 6 }}>
+                        {viewingApp.parents?.mother?.adharCardUrl ? (
+                          <a
+                            href={getDocumentViewUrl(viewingApp.parents.mother.adharCardUrl)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 5,
+                              padding: "4px 10px",
+                              background: "#eff6ff",
+                              border: "1px solid #bfdbfe",
+                              borderRadius: 6,
+                              color: "#1d4ed8",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              textDecoration: "none",
+                            }}
+                          >
+                            <ExternalLink size={12} /> View Mother Aadhaar
+                          </a>
+                        ) : (
+                          <span style={{ fontSize: 11, color: "#94a3b8" }}>Aadhaar Card: Not uploaded</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div style={{ background: "#f8fafc", padding: 12, borderRadius: 10, border: "1px solid #e2e8f0" }}>
@@ -862,6 +980,32 @@ export default function VerifierDashboard() {
                       <div><strong>Name:</strong> {viewingApp.parents?.father?.name || "—"}</div>
                       <div><strong>Aadhaar:</strong> {viewingApp.parents?.father?.adharNumber || "—"}</div>
                       <div><strong>Mobile:</strong> {viewingApp.parents?.father?.mobileNumber || "—"}</div>
+                      <div style={{ marginTop: 6 }}>
+                        {viewingApp.parents?.father?.adharCardUrl ? (
+                          <a
+                            href={getDocumentViewUrl(viewingApp.parents.father.adharCardUrl)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 5,
+                              padding: "4px 10px",
+                              background: "#eff6ff",
+                              border: "1px solid #bfdbfe",
+                              borderRadius: 6,
+                              color: "#1d4ed8",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              textDecoration: "none",
+                            }}
+                          >
+                            <ExternalLink size={12} /> View Father Aadhaar
+                          </a>
+                        ) : (
+                          <span style={{ fontSize: 11, color: "#94a3b8" }}>Aadhaar Card: Not uploaded</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -875,8 +1019,112 @@ export default function VerifierDashboard() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, fontSize: 13 }}>
                   <div><span style={{ color: "#64748b" }}>Provider Name:</span> <strong style={{ display: "block" }}>{viewingApp.informationProvider?.name || "—"}</strong></div>
                   <div><span style={{ color: "#64748b" }}>Relation:</span> <strong style={{ display: "block" }}>{viewingApp.informationProvider?.relationToChild || "—"}</strong></div>
+                  <div><span style={{ color: "#64748b" }}>Aadhaar:</span> <strong style={{ display: "block" }}>{viewingApp.informationProvider?.adharNumber || "—"}</strong></div>
                   <div><span style={{ color: "#64748b" }}>Contact Phone:</span> <strong style={{ display: "block" }}>{viewingApp.informationProvider?.mobileNumber || "—"}</strong></div>
                   <div><span style={{ color: "#64748b" }}>Email:</span> <strong style={{ display: "block" }}>{viewingApp.informationProvider?.email || "—"}</strong></div>
+                  {viewingApp.informationProvider?.adharCardUrl && (
+                    <div>
+                      <span style={{ color: "#64748b" }}>Aadhaar Card:</span>
+                      <div style={{ marginTop: 3 }}>
+                        <a
+                          href={getDocumentViewUrl(viewingApp.informationProvider.adharCardUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 5,
+                            padding: "3px 8px",
+                            background: "#eff6ff",
+                            border: "1px solid #bfdbfe",
+                            borderRadius: 6,
+                            color: "#1d4ed8",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            textDecoration: "none",
+                          }}
+                        >
+                          <ExternalLink size={12} /> View Document
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 4. Uploaded Aadhaar Documents for Verification */}
+              <div style={{ marginBottom: 20 }}>
+                <h4 style={{ fontSize: 14, fontWeight: 800, color: "#1e40af", margin: "0 0 10px", paddingBottom: 4, borderBottom: "1.5px solid #dbeafe", display: "flex", alignItems: "center", gap: 6 }}>
+                  <FileCheck size={16} /> 4. Uploaded Aadhaar Documents for Verification (सत्यापन हेतु आधार दस्तावेज़)
+                </h4>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                  {[
+                    { title: "Mother's Aadhaar (माता)", num: viewingApp.parents?.mother?.adharNumber, url: viewingApp.parents?.mother?.adharCardUrl },
+                    { title: "Father's Aadhaar (पिता)", num: viewingApp.parents?.father?.adharNumber, url: viewingApp.parents?.father?.adharCardUrl },
+                    { title: "Informant's Aadhaar (सूचनादाता)", num: viewingApp.informationProvider?.adharNumber, url: viewingApp.informationProvider?.adharCardUrl },
+                    { title: "Child's Aadhaar (शिशु)", num: viewingApp.child?.adharNumber, url: viewingApp.child?.adharCardUrl },
+                  ].map((doc, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        background: doc.url ? "#f0fdf4" : "#f8fafc",
+                        border: `1px solid ${doc.url ? "#86efac" : "#e2e8f0"}`,
+                        borderRadius: 10,
+                        padding: 12,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                          <strong style={{ fontSize: 12.5, color: "#1e293b" }}>{doc.title}</strong>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              padding: "2px 6px",
+                              borderRadius: 4,
+                              background: doc.url ? "#dcfce7" : "#f1f5f9",
+                              color: doc.url ? "#15803d" : "#64748b",
+                            }}
+                          >
+                            {doc.url ? "✓ Cloudinary" : "Not Provided"}
+                          </span>
+                        </div>
+                        <p style={{ margin: "0 0 8px", fontSize: 12, color: "#475569" }}>
+                          <strong>No:</strong> {doc.num || "—"}
+                        </p>
+                      </div>
+                      {doc.url ? (
+                        <a
+                          href={getDocumentViewUrl(doc.url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "6px 12px",
+                            background: "#16a34a",
+                            color: "white",
+                            borderRadius: 6,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            textDecoration: "none",
+                            width: "100%",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <ExternalLink size={13} /> View Document (देखें)
+                        </a>
+                      ) : (
+                        <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center", padding: "6px 0" }}>
+                          दस्तावेज़ संलग्न नहीं (No file uploaded)
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
 

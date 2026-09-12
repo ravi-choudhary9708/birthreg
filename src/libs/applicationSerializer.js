@@ -10,6 +10,7 @@ export function serializeApplication(app) {
         dateOfBirth: app.child.dateOfBirth,
         gender: app.child.gender,
         adharNumber: app.child.adharNumber || undefined,
+        adharCardUrl: app.child.adharCardUrl || undefined,
         weight: app.child.weight ?? undefined,
         deliveryAttention: app.child.deliveryAttention || undefined,
         deliveryMethod: app.child.deliveryMethod || undefined,
@@ -33,12 +34,14 @@ export function serializeApplication(app) {
         mother: {
             name: app.parents.motherName,
             adharNumber: app.parents.motherAdhar,
+            adharCardUrl: app.parents.motherAdharCardUrl || undefined,
             mobileNumber: app.parents.motherMobile,
             email: app.parents.motherEmail || "",
         },
         father: {
             name: app.parents.fatherName,
             adharNumber: app.parents.fatherAdhar,
+            adharCardUrl: app.parents.fatherAdharCardUrl || undefined,
             mobileNumber: app.parents.fatherMobile,
             email: app.parents.fatherEmail || "",
         },
@@ -71,6 +74,7 @@ export function serializeApplication(app) {
     const informationProvider = app.informant ? {
         name: app.informant.name,
         adharNumber: app.informant.adharNumber || "",
+        adharCardUrl: app.informant.adharCardUrl || undefined,
         mobileNumber: app.informant.mobileNumber,
         email: app.informant.email || "",
         providedInformation: app.informant.providedInformation,
@@ -139,6 +143,7 @@ export function formatPrismaApplicationCreate(data) {
                 dateOfBirth: new Date(child.dateOfBirth),
                 gender: child.gender,
                 adharNumber: child.adharNumber || null,
+                adharCardUrl: child.adharCardUrl || null,
                 weight: child.weight ? parseFloat(child.weight) : null,
                 deliveryAttention: child.deliveryAttention || null,
                 deliveryMethod: child.deliveryMethod || null,
@@ -160,10 +165,12 @@ export function formatPrismaApplicationCreate(data) {
             create: {
                 motherName: parents.mother?.name || "",
                 motherAdhar: parents.mother?.adharNumber || "",
+                motherAdharCardUrl: parents.mother?.adharCardUrl || null,
                 motherMobile: parents.mother?.mobileNumber || "",
                 motherEmail: parents.mother?.email || null,
                 fatherName: parents.father?.name || "",
                 fatherAdhar: parents.father?.adharNumber || "",
+                fatherAdharCardUrl: parents.father?.adharCardUrl || null,
                 fatherMobile: parents.father?.mobileNumber || "",
                 fatherEmail: parents.father?.email || null,
 
@@ -194,6 +201,7 @@ export function formatPrismaApplicationCreate(data) {
             create: {
                 name: informationProvider.name || "",
                 adharNumber: informationProvider.adharNumber || null,
+                adharCardUrl: informationProvider.adharCardUrl || null,
                 mobileNumber: informationProvider.mobileNumber || "",
                 email: informationProvider.email || null,
                 providedInformation: Boolean(informationProvider.providedInformation),

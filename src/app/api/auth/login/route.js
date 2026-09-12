@@ -28,6 +28,14 @@ export async function POST(request) {
             throw new apiError(401, "Invalid username or password");
         }
 
+        // Check if account is deactivated by Operator Central
+        if (user.isActive === false) {
+            throw new apiError(
+                403,
+                "आपका खाता ऑपरेटर सेंट्रल द्वारा निष्क्रिय (Inactive) कर दिया गया है। कृपया पुनः सक्रिय कराने हेतु संपर्क करें। (Your account has been deactivated by Operator Central. Please contact administration.)"
+            );
+        }
+
         // Generate JWT token
         const token = signToken({
             _id: user.id,

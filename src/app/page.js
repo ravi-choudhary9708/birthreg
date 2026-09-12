@@ -29,13 +29,13 @@ function getFacilityMeta(name) {
     return {
       name,
       categoryKey: "SADAR",
-      type: "District Apex Hospital",
-      tag: "District Apex",
+      type: "District Hospital",
+      tag: "District Hospital",
       badgeColor: "#92400e",
       badgeBg: "#fef3c7",
       badgeBorder: "#fde68a",
       icon: "🏥",
-      level: "Apex Civil Hospital",
+      level: "District Civil Hospital",
       block: formattedBlock,
     };
   }
@@ -86,11 +86,25 @@ function getFacilityMeta(name) {
 
 const FACILITY_METAS = FACILITIES.map(getFacilityMeta);
 const MARQUEE_ROW_1 = FACILITY_METAS.slice(0, 20);
-const MARQUEE_ROW_2 = FACILITY_METAS.slice(20);
+const MARQUEE_ROW_2 = FACILITY_METAS.slice(20, 40);
 
 export default function HomePage() {
   const mainRef = useRef(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [facilitiesList, setFacilitiesList] = useState(FACILITY_METAS);
+  const marqueeRow1 = facilitiesList.slice(0, 20);
+  const marqueeRow2 = facilitiesList.slice(20, 40);
+
+  useEffect(() => {
+    fetch("/api/facilities")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.data?.facilities) && data.data.facilities.length > 0) {
+          setFacilitiesList(data.data.facilities);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger);
@@ -557,7 +571,7 @@ export default function HomePage() {
               background: "#eff6ff",
             }}
           >
-            🏥 Facility Directory (39 Facilities)
+            🏥 Facility Directory (606 Facilities)
           </Link>
           <Link
             href="/track"
@@ -930,8 +944,8 @@ export default function HomePage() {
                 lineHeight: 1.6,
               }}
             >
-              Official civil birth registration across all 39 authorized government hospitals,
-              Sub-Divisional referral units, CHCs, and PHCs in Madhubani District.
+              Official civil birth registration across all 606 authorized government healthcare facilities,
+              Sub-Divisional hospitals, CHCs, PHCs, and HWCs in Madhubani District.
             </p>
           </div>
 
@@ -940,7 +954,7 @@ export default function HomePage() {
             className="anim-fac-stats"
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
               gap: 16,
               marginBottom: 36,
             }}
@@ -976,7 +990,7 @@ export default function HomePage() {
               </div>
               <div>
                 <div style={{ fontSize: 24, fontWeight: 800, color: "#1e3a8a", lineHeight: 1.1 }}>
-                  39
+                  606
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>
                   Total Authorized Facilities
@@ -1019,7 +1033,7 @@ export default function HomePage() {
                   1
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>
-                  District Apex Hospital
+                  District Hospital
                 </div>
                 <div style={{ fontSize: 11, color: "#94a3b8" }}>Sadar Hospital Madhubani</div>
               </div>
@@ -1096,12 +1110,52 @@ export default function HomePage() {
               </div>
               <div>
                 <div style={{ fontSize: 24, fontWeight: 800, color: "#065f46", lineHeight: 1.1 }}>
-                  34
+                  71
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>
                   CHCs & PHCs Network
                 </div>
-                <div style={{ fontSize: 11, color: "#94a3b8" }}>12 CHCs + 22 PHCs / APHCs</div>
+                <div style={{ fontSize: 11, color: "#94a3b8" }}>17 CHCs + 54 PHCs / APHCs</div>
+              </div>
+            </div>
+
+            <div
+              className="anim-fac-stat-card"
+              style={{
+                background: "white",
+                borderRadius: 14,
+                padding: "18px 20px",
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.03)",
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+              }}
+            >
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 10,
+                  background: "#f0f9ff",
+                  border: "1px solid #bae6fd",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 22,
+                  flexShrink: 0,
+                }}
+              >
+                🏠
+              </div>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: "#0369a1", lineHeight: 1.1 }}>
+                  530
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>
+                  HSCs & HWCs Network
+                </div>
+                <div style={{ fontSize: 11, color: "#94a3b8" }}>Health Sub-Centres & Wellness Centres</div>
               </div>
             </div>
           </div>
@@ -1121,7 +1175,7 @@ export default function HomePage() {
           >
             {/* Row 1: Drift Left */}
             <div className="marquee-track-left">
-              {[...MARQUEE_ROW_1, ...MARQUEE_ROW_1].map((f, i) => (
+              {[...marqueeRow1, ...marqueeRow1].map((f, i) => (
                 <div
                   key={`r1-${i}`}
                   style={{
@@ -1170,7 +1224,7 @@ export default function HomePage() {
 
             {/* Row 2: Drift Right */}
             <div className="marquee-track-right">
-              {[...MARQUEE_ROW_2, ...MARQUEE_ROW_2].map((f, i) => (
+              {[...marqueeRow2, ...marqueeRow2].map((f, i) => (
                 <div
                   key={`r2-${i}`}
                   style={{
@@ -1270,7 +1324,7 @@ export default function HomePage() {
                 </h3>
                 <p style={{ fontSize: 14, color: "#64748b", lineHeight: 1.6, margin: 0 }}>
                   Looking for your local PHC, CHC, or Sub-Divisional Hospital? Visit our dedicated, searchable
-                  directory with all 39 facilities, their blocks, jurisdiction tiers, and direct 1-click registration links.
+                  directory with all 606 facilities, their blocks, jurisdiction tiers, and direct 1-click registration links.
                 </p>
               </div>
 
@@ -1294,7 +1348,7 @@ export default function HomePage() {
                     textAlign: "center",
                   }}
                 >
-                  <span>Browse All 39 Facilities Directory</span>
+                  <span>Browse All 606 Facilities Directory</span>
                   <span>→</span>
                 </Link>
                 <Link
@@ -1426,7 +1480,7 @@ export default function HomePage() {
         <div style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap", margin: "14px 0 12px", fontSize: 13 }}>
           <Link href="/" style={{ color: "#4b5563", textDecoration: "none", fontWeight: 500 }}>Home</Link>
           <span style={{ color: "#d1d5db" }}>•</span>
-          <Link href="/facilities" style={{ color: "#1e40af", textDecoration: "none", fontWeight: 600 }}>Facility Directory</Link>
+          <Link href="/facilities" style={{ color: "#4b5563", textDecoration: "none", fontWeight: 500 }}>Facility Directory</Link>
           <span style={{ color: "#d1d5db" }}>•</span>
           <Link href="/track" style={{ color: "#4b5563", textDecoration: "none", fontWeight: 500 }}>Track Application</Link>
           <span style={{ color: "#d1d5db" }}>•</span>
