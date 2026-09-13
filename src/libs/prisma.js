@@ -52,10 +52,18 @@ function createPrismaClient() {
 }
 
 // In development, clear cached instance if schema has been updated
-const PRISMA_SCHEMA_BUILD = "2026-09-12-facility-table-v1";
+const PRISMA_SCHEMA_BUILD = "2026-09-13-raw-password-v3";
 if (process.env.NODE_ENV !== "production") {
     if (globalForPrisma.__prisma_schema_build !== PRISMA_SCHEMA_BUILD) {
+        if (globalForPrisma.prisma) {
+            try {
+                globalForPrisma.prisma.$disconnect();
+            } catch {
+                // ignore
+            }
+        }
         globalForPrisma.prisma = undefined;
+        globalForPrisma.pgPool = undefined;
         globalForPrisma.__prisma_schema_build = PRISMA_SCHEMA_BUILD;
     }
 }

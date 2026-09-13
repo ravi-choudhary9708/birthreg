@@ -37,6 +37,8 @@ import {
   Globe,
   Upload,
   Eye,
+  EyeOff,
+  Copy,
   ExternalLink,
   Download,
   UserCheck,
@@ -53,7 +55,7 @@ import {
   Lock,
   Users,
 } from "lucide-react";
-import { FACILITIES, FACILITIES_BY_BLOCK } from "@/utils/constants";
+import { FACILITIES, FACILITIES_DATA, FACILITIES_BY_BLOCK } from "@/utils/constants";
 import { getDocumentViewUrl } from "@/utils/documentViewer";
 import { useRefreshSecurity } from "@/hooks/useRefreshSecurity";
 
@@ -74,10 +76,10 @@ const HospitalNetwork3D = dynamic(() => import("@/components/HospitalNetwork3D")
   loading: () => (
     <div style={{
       width: "100%",
-      height: 380,
-      borderRadius: 16,
-      background: "radial-gradient(ellipse at center, #1e1b4b 0%, #0f172a 80%)",
-      border: "1px solid #334155",
+      height: 480,
+      borderRadius: 20,
+      background: "linear-gradient(145deg, #0b1120 0%, #060913 100%)",
+      border: "1px solid #1e293b",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -85,7 +87,7 @@ const HospitalNetwork3D = dynamic(() => import("@/components/HospitalNetwork3D")
       fontSize: 13,
       fontWeight: 600,
     }}>
-      Loading 3D Health Facilities Topology...
+      Loading District 606 Health Facilities Spatial Command...
     </div>
   ),
 });
@@ -109,6 +111,8 @@ export default function OperatorDashboard() {
   // Facility filter and search
   const [facilitySearch, setFacilitySearch] = useState("");
   const [facilityFilter, setFacilityFilter] = useState("ALL"); // ALL | OVERDUE | PENDING | COMPLIANT
+  const [facilityPage, setFacilityPage] = useState(1);
+  const [facilityPageSize, setFacilityPageSize] = useState(25);
   const [expandedHospital, setExpandedHospital] = useState(null);
   const [auditingFacility, setAuditingFacility] = useState(null);
   const [auditFacilityFilter, setAuditFacilityFilter] = useState("ALL");
@@ -136,14 +140,44 @@ export default function OperatorDashboard() {
   const [newVerifierLoading, setNewVerifierLoading] = useState(false);
   const [newVerifierError, setNewVerifierError] = useState("");
   const [newVerifierSuccess, setNewVerifierSuccess] = useState("");
+  const [newVerifierFacilitySearch, setNewVerifierFacilitySearch] = useState("");
+  const [newVerifierFacilityBlock, setNewVerifierFacilityBlock] = useState("ALL");
+  const [isFacilityDropdownOpen, setIsFacilityDropdownOpen] = useState(false);
+  const [showNewVerifierPassword, setShowNewVerifierPassword] = useState(false);
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(null);
   const [resetPasswordVal, setResetPasswordVal] = useState("");
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [resetPasswordError, setResetPasswordError] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordCopied, setPasswordCopied] = useState(false);
   const [toggleLoadingId, setToggleLoadingId] = useState(null);
   const [confirmToggleModal, setConfirmToggleModal] = useState(null);
   const [facilitiesByBlock, setFacilitiesByBlock] = useState(FACILITIES_BY_BLOCK);
   const [totalFacilitiesCount, setTotalFacilitiesCount] = useState(FACILITIES.length);
+
+  const availableBlocks = useMemo(() => {
+    const blocks = new Set();
+    FACILITIES_DATA.forEach((f) => {
+      if (f.block) blocks.add(f.block);
+    });
+    return Array.from(blocks).sort();
+  }, []);
+
+  const filteredNewVerifierFacilities = useMemo(() => {
+    const q = newVerifierFacilitySearch.toLowerCase().trim();
+    const block = newVerifierFacilityBlock;
+    const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
+
+    return FACILITIES_DATA.filter((f) => {
+      if (block !== "ALL" && f.block?.toLowerCase() !== block.toLowerCase()) {
+        return false;
+      }
+      if (tokens.length === 0) return true;
+      const searchable = `${f.name} ${f.block} ${f.type || ""} ${f.pin || ""} ${f.rawName || ""}`.toLowerCase();
+      return tokens.every((tok) => searchable.includes(tok));
+    });
+  }, [newVerifierFacilitySearch, newVerifierFacilityBlock]);
 
   const router = useRouter();
   const containerRef = useRef(null);
@@ -252,7 +286,7 @@ export default function OperatorDashboard() {
     try {
       const res = await fetch("/api/admin/applications");
       const data = await res.json();
-      if (res.status === 401) { router.push("/logout?reason=refresh"); return; }
+      if (res.status === 401) { router.push("/logout?reason=session_expired"); return; }
       if (!data.success) throw new Error(data.message);
       const list = Array.isArray(data.data) ? data.data : (data.data?.applications || []);
       setApps(list);
@@ -269,7 +303,7 @@ export default function OperatorDashboard() {
     try {
       const res = await fetch("/api/admin/statistics");
       const data = await res.json();
-      if (res.status === 401) { router.push("/logout?reason=refresh"); return; }
+      if (res.status === 401) { router.push("/logout?reason=session_expired"); return; }
       if (!data.success) throw new Error(data.message);
       setStats(data.data);
     } catch (err) {
@@ -282,25 +316,28 @@ export default function OperatorDashboard() {
   // Fetch verifiers list
   // Fetch verifiers list with auto-retry on serverless cold-start
   const fetchVerifiers = useCallback(async (isRetry = false) => {
-    setVerifiersLoading(true);
-    setVerifiersError("");
-    try {
-      const res = await fetch("/api/admin/verifiers");
-      const data = await res.json();
-      if (res.status === 401) { router.push("/logout?reason=refresh"); return; }
-      if (!data.success) throw new Error(data.message);
-      setVerifiers(data.data || []);
+    const run = async (retry) => {
+      setVerifiersLoading(true);
       setVerifiersError("");
-      setVerifiersLoading(false);
-    } catch (err) {
-      if (!isRetry) {
-        // Automatic single retry in case of database cold start
-        setTimeout(() => fetchVerifiers(true), 1200);
-        return;
+      try {
+        const res = await fetch("/api/admin/verifiers");
+        const data = await res.json();
+        if (res.status === 401) { router.push("/logout?reason=session_expired"); return; }
+        if (!data.success) throw new Error(data.message);
+        setVerifiers(data.data || []);
+        setVerifiersError("");
+        setVerifiersLoading(false);
+      } catch (err) {
+        if (!retry) {
+          // Automatic single retry in case of database cold start
+          setTimeout(() => run(true), 1200);
+          return;
+        }
+        setVerifiersError(err.message || "Failed to load verifiers");
+        setVerifiersLoading(false);
       }
-      setVerifiersError(err.message || "Failed to load verifiers");
-      setVerifiersLoading(false);
-    }
+    };
+    return run(isRetry);
   }, [router]);
 
   useEffect(() => {
@@ -360,6 +397,10 @@ export default function OperatorDashboard() {
           contactNumber: "",
           email: "",
         });
+        setNewVerifierFacilitySearch("");
+        setNewVerifierFacilityBlock("ALL");
+        setIsFacilityDropdownOpen(false);
+        setShowNewVerifierPassword(false);
         setNewVerifierSuccess("");
       }, 1200);
     } catch (err) {
@@ -398,16 +439,28 @@ export default function OperatorDashboard() {
     setResetPasswordLoading(true);
     setResetPasswordError("");
     try {
+      const newPwd = resetPasswordVal.trim();
       const res = await fetch(`/api/admin/verifiers/${showResetPasswordModal.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: resetPasswordVal.trim() }),
+        body: JSON.stringify({ password: newPwd }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
-      alert(`सत्यापनकर्ता '${showResetPasswordModal.username}' का पासवर्ड सफलतापूर्वक अद्यतन कर दिया गया।`);
+      setVerifiers((prev) =>
+        prev.map((v) =>
+          v.id === showResetPasswordModal.id ? { ...v, rawPassword: newPwd } : v
+        )
+      );
+      setShowResetPasswordModal((prev) =>
+        prev ? { ...prev, rawPassword: newPwd } : null
+      );
+      alert(`सत्यापनकर्ता '${showResetPasswordModal.username}' का पासवर्ड सफलतापूर्वक अद्यतन कर दिया गया। नया पासवर्ड: ${newPwd}`);
       setShowResetPasswordModal(null);
       setResetPasswordVal("");
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setPasswordCopied(false);
     } catch (err) {
       setResetPasswordError(err.message);
     } finally {
@@ -507,11 +560,31 @@ export default function OperatorDashboard() {
 
   const handleLogout = async () => {
     try {
+      sessionStorage.removeItem("dashboard_session_active");
+      sessionStorage.removeItem("just_logged_in");
       await fetch("/api/auth/logout", { method: "POST" });
     } catch (err) {
       console.error("Logout error:", err);
     }
     router.push("/logout?reason=manual");
+  };
+
+  const handleExitToHome = async (e) => {
+    e.preventDefault();
+    const confirmed = window.confirm(
+      "⚠️ सुरक्षा सूचना | Security Notice\n\nहोम पेज पर जाने पर आपका सत्र समाप्त हो जाएगा।\nYour session will be terminated. Proceed?"
+    );  
+    if (!confirmed) return;
+
+    try {
+      sessionStorage.removeItem("dashboard_session_active");
+      sessionStorage.removeItem("just_logged_in");
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Logout error on exit:", err);
+    } finally {
+      window.location.replace("/");
+    }
   };
 
   const pending = apps.filter(a => a.status === "PENDING_OPERATOR").length;
@@ -531,6 +604,14 @@ export default function OperatorDashboard() {
       return true;
     });
   }, [stats, facilitySearch, facilityFilter]);
+
+  const facilityTotalPages = Math.ceil(filteredFacilities.length / (facilityPageSize === -1 ? (filteredFacilities.length || 1) : facilityPageSize)) || 1;
+  const currentFacilityPage = Math.min(Math.max(1, facilityPage), facilityTotalPages);
+  const paginatedFacilities = useMemo(() => {
+    if (facilityPageSize === -1) return filteredFacilities;
+    const start = (currentFacilityPage - 1) * facilityPageSize;
+    return filteredFacilities.slice(start, start + facilityPageSize);
+  }, [filteredFacilities, currentFacilityPage, facilityPageSize]);
 
   // Filtered applications for District Audit Log
   const auditFilteredApps = useMemo(() => {
@@ -617,10 +698,20 @@ export default function OperatorDashboard() {
       <header className="anim-op-header" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 16px", position: "sticky", top: 0, zIndex: 40 }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 64, flexWrap: "wrap", gap: 12, padding: "8px 0" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Link
-              href="/"
-              style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0 }}
-              title="Government of Bihar"
+            <button
+              type="button"
+              onClick={handleExitToHome}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                background: "none",
+                border: "none",
+                padding: 0,
+                margin: 0,
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+              title="Government of Bihar • Click to exit to Citizen Home"
             >
               <img
                 src="/bihar_government.webp"
@@ -637,7 +728,7 @@ export default function OperatorDashboard() {
                   e.currentTarget.src = "/logo.png";
                 }}
               />
-            </Link>
+            </button>
 
             <div
               style={{
@@ -910,6 +1001,7 @@ export default function OperatorDashboard() {
                   onSelectFacility={(name) => {
                     setFacilitySearch(name);
                     setFacilityFilter("ALL");
+                    setFacilityPage(1);
                     const el = document.getElementById("hospital-audit-directory");
                     if (el) el.scrollIntoView({ behavior: "smooth" });
                   }}
@@ -1064,7 +1156,10 @@ export default function OperatorDashboard() {
                         type="text"
                         placeholder="Search hospital name..."
                         value={facilitySearch}
-                        onChange={(e) => setFacilitySearch(e.target.value)}
+                        onChange={(e) => {
+                          setFacilitySearch(e.target.value);
+                          setFacilityPage(1);
+                        }}
                         style={{
                           padding: "8px 14px 8px 36px", border: "1px solid #cbd5e1", borderRadius: 8,
                           fontSize: 13, width: 220, outline: "none",
@@ -1084,7 +1179,10 @@ export default function OperatorDashboard() {
                   ].map((btn) => (
                     <button
                       key={btn.id}
-                      onClick={() => setFacilityFilter(btn.id)}
+                      onClick={() => {
+                        setFacilityFilter(btn.id);
+                        setFacilityPage(1);
+                      }}
                       style={{
                         padding: "6px 12px", borderRadius: 100, fontSize: 12, fontWeight: 700,
                         border: facilityFilter === btn.id ? "1px solid #7c3aed" : "1px solid #e2e8f0",
@@ -1130,7 +1228,7 @@ export default function OperatorDashboard() {
                         </td>
                       </tr>
                     ) : (
-                      filteredFacilities.map((fac, idx) => {
+                      paginatedFacilities.map((fac, idx) => {
                         const isOverdue = fac.overdueVerifier > 0;
                         const isExpanded = expandedHospital === fac.facility;
                         return (
@@ -1268,6 +1366,141 @@ export default function OperatorDashboard() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination Bar for Health Facilities Audit Directory */}
+              {filteredFacilities.length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    padding: "16px 24px",
+                    background: "#f8fafc",
+                    borderTop: "1px solid #e2e8f0",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 13, color: "#64748b" }}>
+                      Showing <strong>{facilityPageSize === -1 ? 1 : ((facilityPage - 1) * facilityPageSize) + 1}</strong> - <strong>{facilityPageSize === -1 ? filteredFacilities.length : Math.min(facilityPage * facilityPageSize, filteredFacilities.length)}</strong> of <strong>{filteredFacilities.length}</strong> facilities
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>Per page:</span>
+                      <select
+                        value={facilityPageSize}
+                        onChange={(e) => setFacilityPageSize(Number(e.target.value))}
+                        style={{
+                          padding: "4px 8px",
+                          borderRadius: 6,
+                          border: "1px solid #cbd5e1",
+                          fontSize: 12,
+                          background: "white",
+                          color: "#334155",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          outline: "none",
+                        }}
+                      >
+                        <option value={15}>15 per page</option>
+                        <option value={25}>25 per page</option>
+                        <option value={50}>50 per page</option>
+                        <option value={100}>100 per page</option>
+                        <option value={-1}>Show All ({filteredFacilities.length})</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {facilityPageSize !== -1 && facilityTotalPages > 1 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <button
+                        onClick={() => {
+                          setFacilityPage(1);
+                          const el = document.getElementById("hospital-audit-directory");
+                          if (el) el.scrollIntoView({ behavior: "smooth" });
+                        }}
+                        disabled={facilityPage === 1}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          border: "1px solid #cbd5e1",
+                          background: facilityPage === 1 ? "#f1f5f9" : "white",
+                          color: facilityPage === 1 ? "#94a3b8" : "#334155",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: facilityPage === 1 ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        « First
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFacilityPage((p) => Math.max(1, p - 1));
+                          const el = document.getElementById("hospital-audit-directory");
+                          if (el) el.scrollIntoView({ behavior: "smooth" });
+                        }}
+                        disabled={facilityPage === 1}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          border: "1px solid #cbd5e1",
+                          background: facilityPage === 1 ? "#f1f5f9" : "white",
+                          color: facilityPage === 1 ? "#94a3b8" : "#334155",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: facilityPage === 1 ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        ‹ Prev
+                      </button>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: "#1e293b", margin: "0 6px" }}>
+                        Page {facilityPage} of {facilityTotalPages}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setFacilityPage((p) => Math.min(facilityTotalPages, p + 1));
+                          const el = document.getElementById("hospital-audit-directory");
+                          if (el) el.scrollIntoView({ behavior: "smooth" });
+                        }}
+                        disabled={facilityPage === facilityTotalPages}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          border: "1px solid #cbd5e1",
+                          background: facilityPage === facilityTotalPages ? "#f1f5f9" : "white",
+                          color: facilityPage === facilityTotalPages ? "#94a3b8" : "#334155",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: facilityPage === facilityTotalPages ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        Next ›
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFacilityPage(facilityTotalPages);
+                          const el = document.getElementById("hospital-audit-directory");
+                          if (el) el.scrollIntoView({ behavior: "smooth" });
+                        }}
+                        disabled={facilityPage === facilityTotalPages}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          border: "1px solid #cbd5e1",
+                          background: facilityPage === facilityTotalPages ? "#f1f5f9" : "white",
+                          color: facilityPage === facilityTotalPages ? "#94a3b8" : "#334155",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: facilityPage === facilityTotalPages ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        Last »
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1285,17 +1518,6 @@ export default function OperatorDashboard() {
               <p style={{ color: "#64748b", fontSize: 14, margin: 0 }}>
                 Supervisory log of all birth registrations processed across Madhubani District. Each hospital verifier independently approves, rejects with reason, enters CRS details, and uploads certificates.
               </p>
-            </div>
-
-            {/* Advisory / Role Separation Notice */}
-            <div style={{
-              background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12,
-              padding: "14px 18px", marginBottom: 22, display: "flex", alignItems: "center", gap: 12,
-            }}>
-              <Building2 size={24} color="#2563eb" style={{ flexShrink: 0 }} />
-              <div style={{ fontSize: 13, color: "#1e40af", lineHeight: 1.5 }}>
-                <strong>Decentralized Facility Pipeline:</strong> All 606 primary health centers, community health centers, wellness centers, and referral hospitals process their applications locally. Central Operator audits SLA adherence, monitors verification timeliness, inspects verifier rejection reasons, and tracks certificate issuance.
-              </div>
             </div>
 
             {/* Search & Filter Bar */}
@@ -1823,25 +2045,25 @@ export default function OperatorDashboard() {
                 </div>
               ) : (
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <table style={{ width: "100%", minWidth: 840, borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
                       <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                        <th style={{ padding: "12px 16px", textAlign: "left", color: "#475569", fontWeight: 700 }}>
+                        <th style={{ padding: "10px 14px", textAlign: "left", color: "#475569", fontWeight: 700, fontSize: 12, width: "23%" }}>
                           Authority Details (अधिकारी विवरण)
                         </th>
-                        <th style={{ padding: "12px 16px", textAlign: "left", color: "#475569", fontWeight: 700 }}>
+                        <th style={{ padding: "10px 14px", textAlign: "left", color: "#475569", fontWeight: 700, fontSize: 12, width: "22%" }}>
                           Health Facility Jurisdiction (अस्पताल अधिकार क्षेत्र)
                         </th>
-                        <th style={{ padding: "12px 16px", textAlign: "left", color: "#475569", fontWeight: 700 }}>
+                        <th style={{ padding: "10px 14px", textAlign: "left", color: "#475569", fontWeight: 700, fontSize: 12, width: "13%" }}>
                           Login ID (यूजरनेम)
                         </th>
-                        <th style={{ padding: "12px 16px", textAlign: "center", color: "#475569", fontWeight: 700 }}>
+                        <th style={{ padding: "10px 14px", textAlign: "center", color: "#475569", fontWeight: 700, fontSize: 12, width: "14%" }}>
                           Workload Activity
                         </th>
-                        <th style={{ padding: "12px 16px", textAlign: "center", color: "#475569", fontWeight: 700 }}>
-                          Status & Applications Control
+                        <th style={{ padding: "10px 14px", textAlign: "center", color: "#475569", fontWeight: 700, fontSize: 12, width: "11%" }}>
+                          Status (स्थिति)
                         </th>
-                        <th style={{ padding: "12px 16px", textAlign: "right", color: "#475569", fontWeight: 700 }}>
+                        <th style={{ padding: "10px 14px", textAlign: "right", color: "#475569", fontWeight: 700, fontSize: 12, width: "17%" }}>
                           Actions (कार्रवाई)
                         </th>
                       </tr>
@@ -1857,8 +2079,8 @@ export default function OperatorDashboard() {
                           }}
                         >
                           {/* Column 1: Authority Details */}
-                          <td style={{ padding: "14px 16px", verticalAlign: "middle" }}>
-                            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                          <td style={{ padding: "10px 14px", verticalAlign: "middle" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                               <div
                                 style={{
                                   width: 36,
@@ -1871,29 +2093,29 @@ export default function OperatorDashboard() {
                                   alignItems: "center",
                                   justifyContent: "center",
                                   fontWeight: 700,
-                                  fontSize: 14,
+                                  fontSize: 13.5,
                                   flexShrink: 0,
                                 }}
                               >
-                                {v.authorityName ? v.authorityName.charAt(0).toUpperCase() : <User size={16} />}
+                                {v.authorityName ? v.authorityName.charAt(0).toUpperCase() : <User size={15} />}
                               </div>
-                              <div>
-                                <strong style={{ display: "block", fontSize: 13.5, color: "#0f172a" }}>
+                              <div style={{ minWidth: 0 }}>
+                                <strong style={{ display: "block", fontSize: 13, color: "#0f172a", lineHeight: 1.3 }}>
                                   {v.authorityName || "Nodal Verification Officer"}
                                 </strong>
-                                <span style={{ fontSize: 11.5, color: "#64748b" }}>
+                                <span style={{ fontSize: 11, color: "#64748b", display: "block", marginTop: 1 }}>
                                   {v.designation || "Facility Verification Officer / MOIC"}
                                 </span>
                                 {(v.contactNumber || v.email) && (
-                                  <div style={{ display: "flex", gap: 10, marginTop: 4, fontSize: 11, color: "#64748b" }}>
+                                  <div style={{ display: "flex", gap: 8, marginTop: 3, fontSize: 10.5, color: "#64748b" }}>
                                     {v.contactNumber && (
                                       <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                                        <Phone size={11} /> {v.contactNumber}
+                                        <Phone size={10} /> {v.contactNumber}
                                       </span>
                                     )}
                                     {v.email && (
                                       <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                                        <Mail size={11} /> {v.email}
+                                        <Mail size={10} /> {v.email}
                                       </span>
                                     )}
                                   </div>
@@ -1903,8 +2125,8 @@ export default function OperatorDashboard() {
                           </td>
 
                           {/* Column 2: Health Facility Jurisdiction */}
-                          <td style={{ padding: "14px 16px", verticalAlign: "middle" }}>
-                            <div style={{ fontWeight: 600, color: "#1e293b", fontSize: 13 }}>
+                          <td style={{ padding: "10px 14px", verticalAlign: "middle" }}>
+                            <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 13, lineHeight: 1.3 }}>
                               {v.facility}
                             </div>
                             <div style={{ marginTop: 4 }}>
@@ -1913,154 +2135,175 @@ export default function OperatorDashboard() {
                                   style={{
                                     display: "inline-flex",
                                     alignItems: "center",
-                                    gap: 4,
+                                    gap: 3,
                                     fontSize: 10.5,
-                                    fontWeight: 700,
+                                    fontWeight: 600,
                                     color: "#15803d",
                                     background: "#f0fdf4",
-                                    padding: "2px 7px",
+                                    padding: "1px 6px",
                                     borderRadius: 4,
                                     border: "1px solid #bbf7d0",
+                                    whiteSpace: "nowrap",
                                   }}
                                 >
-                                  ✓ Applications Allowed (आवेदन स्वीकार्य)
+                                  ✓ Intake Active
                                 </span>
                               ) : (
                                 <span
                                   style={{
                                     display: "inline-flex",
                                     alignItems: "center",
-                                    gap: 4,
+                                    gap: 3,
                                     fontSize: 10.5,
-                                    fontWeight: 700,
+                                    fontWeight: 600,
                                     color: "#b91c1c",
                                     background: "#fef2f2",
-                                    padding: "2px 7px",
+                                    padding: "1px 6px",
                                     borderRadius: 4,
                                     border: "1px solid #fecaca",
+                                    whiteSpace: "nowrap",
                                   }}
                                 >
-                                  ⚠️ Applications Suspended (आवेदन निलंबित)
+                                  ⚠️ Intake Suspended
                                 </span>
                               )}
                             </div>
                           </td>
 
                           {/* Column 3: Login ID */}
-                          <td style={{ padding: "14px 16px", verticalAlign: "middle" }}>
-                            <div
+                          <td style={{ padding: "10px 14px", verticalAlign: "middle" }}>
+                            <span
                               style={{
                                 fontFamily: "ui-monospace, monospace",
                                 fontWeight: 700,
-                                fontSize: 12.5,
+                                fontSize: 12,
                                 color: "#1e40af",
                                 background: "#eff6ff",
-                                padding: "4px 8px",
-                                borderRadius: 6,
+                                padding: "3px 7px",
+                                borderRadius: 5,
                                 display: "inline-block",
                                 border: "1px solid #bfdbfe",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               {v.username}
-                            </div>
-                            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                            </span>
+                            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>
                               Added {new Date(v.createdAt).toLocaleDateString("en-IN")}
                             </div>
                           </td>
 
                           {/* Column 4: Workload Activity */}
-                          <td style={{ padding: "14px 16px", textAlign: "center", verticalAlign: "middle" }}>
-                            <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
-                              <div style={{ textAlign: "center" }}>
-                                <span style={{ fontSize: 11, color: "#64748b", display: "block" }}>Pending</span>
-                                <strong
-                                  style={{
-                                    fontSize: 13,
-                                    color: (v.stats?.pendingVerifier ?? 0) > 0 ? "#d97706" : "#64748b",
-                                  }}
-                                >
+                          <td style={{ padding: "10px 14px", textAlign: "center", verticalAlign: "middle" }}>
+                            <div
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 8,
+                                padding: "4px 10px",
+                                background: "#f8fafc",
+                                borderRadius: 8,
+                                border: "1px solid #e2e8f0",
+                              }}
+                            >
+                              <div style={{ textAlign: "center", minWidth: 38 }}>
+                                <span style={{ fontSize: 10, color: "#64748b", display: "block", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                                  Pending
+                                </span>
+                                <strong style={{ fontSize: 13, color: (v.stats?.pendingVerifier ?? 0) > 0 ? "#d97706" : "#475569", fontWeight: 800 }}>
                                   {v.stats?.pendingVerifier ?? 0}
                                 </strong>
                               </div>
-                              <div style={{ width: 1, height: 24, background: "#e2e8f0" }} />
-                              <div style={{ textAlign: "center" }}>
-                                <span style={{ fontSize: 11, color: "#64748b", display: "block" }}>Verified</span>
-                                <strong style={{ fontSize: 13, color: "#16a34a" }}>
+                              <div style={{ width: 1, height: 20, background: "#e2e8f0" }} />
+                              <div style={{ textAlign: "center", minWidth: 38 }}>
+                                <span style={{ fontSize: 10, color: "#64748b", display: "block", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                                  Verified
+                                </span>
+                                <strong style={{ fontSize: 13, color: "#16a34a", fontWeight: 800 }}>
                                   {(v.stats?.pendingOperator ?? 0) + (v.stats?.completed ?? 0)}
                                 </strong>
                               </div>
                             </div>
                           </td>
 
-                          {/* Column 5: Operational Status & Effects */}
-                          <td style={{ padding: "14px 16px", textAlign: "center", verticalAlign: "middle" }}>
+                          {/* Column 5: Status */}
+                          <td style={{ padding: "10px 14px", textAlign: "center", verticalAlign: "middle" }}>
                             {v.isActive ? (
                               <span
                                 style={{
                                   display: "inline-flex",
                                   alignItems: "center",
-                                  gap: 5,
-                                  padding: "4px 10px",
-                                  borderRadius: 20,
-                                  fontSize: 12,
+                                  gap: 4,
+                                  padding: "3px 9px",
+                                  borderRadius: 14,
+                                  fontSize: 11,
                                   fontWeight: 700,
                                   background: "#dcfce7",
                                   color: "#15803d",
                                   border: "1px solid #86efac",
+                                  whiteSpace: "nowrap",
                                 }}
                               >
-                                <Check size={13} /> Active (सक्रिय)
+                                <Check size={11} /> Active
                               </span>
                             ) : (
                               <span
                                 style={{
                                   display: "inline-flex",
                                   alignItems: "center",
-                                  gap: 5,
-                                  padding: "4px 10px",
-                                  borderRadius: 20,
-                                  fontSize: 12,
+                                  gap: 4,
+                                  padding: "3px 9px",
+                                  borderRadius: 14,
+                                  fontSize: 11,
                                   fontWeight: 700,
                                   background: "#fee2e2",
                                   color: "#dc2626",
                                   border: "1px solid #fca5a5",
+                                  whiteSpace: "nowrap",
                                 }}
                               >
-                                <X size={13} /> Inactive (निष्क्रिय)
+                                <X size={11} /> Inactive
                               </span>
                             )}
                           </td>
 
                           {/* Column 6: Actions */}
-                          <td style={{ padding: "14px 16px", textAlign: "right", verticalAlign: "middle" }}>
-                            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, alignItems: "center" }}>
+                          <td style={{ padding: "10px 14px", textAlign: "right", verticalAlign: "middle" }}>
+                            <div style={{ display: "inline-flex", justifyContent: "flex-end", gap: 6, alignItems: "center" }}>
                               {/* Toggle Active/Inactive Button */}
                               <button
                                 disabled={toggleLoadingId === v.id}
                                 onClick={() => setConfirmToggleModal(v)}
                                 title={
                                   v.isActive
-                                    ? "Click to deactivate this verifier (blocks login and hospital applications)"
-                                    : "Click to activate this verifier (allows login and hospital applications)"
+                                    ? "Deactivate verifier account (खाता निष्क्रिय करें)"
+                                    : "Activate verifier account (खाता सक्रिय करें)"
                                 }
                                 style={{
-                                  padding: "6px 12px",
+                                  width: 88,
+                                  minWidth: 88,
+                                  height: 30,
+                                  minHeight: 30,
+                                  padding: "0 6px",
                                   borderRadius: 6,
-                                  fontSize: 12,
+                                  fontSize: 11.5,
                                   fontWeight: 600,
-                                  border: "1px solid",
-                                  cursor: "pointer",
+                                  border: `1px solid ${v.isActive ? "#fecaca" : "#bbf7d0"}`,
+                                  cursor: toggleLoadingId === v.id ? "not-allowed" : "pointer",
                                   display: "inline-flex",
                                   alignItems: "center",
-                                  gap: 5,
+                                  justifyContent: "center",
+                                  gap: 4,
                                   background: v.isActive ? "#fef2f2" : "#f0fdf4",
-                                  borderColor: v.isActive ? "#fecaca" : "#bbf7d0",
-                                  color: v.isActive ? "#dc2626" : "#16a34a",
+                                  color: v.isActive ? "#dc2626" : "#15803d",
+                                  boxSizing: "border-box",
+                                  whiteSpace: "nowrap",
                                   transition: "all 0.15s ease",
                                 }}
                               >
                                 <Power size={12} />
-                                {v.isActive ? "Deactivate (निष्क्रिय करें)" : "Activate (सक्रिय करें)"}
+                                {v.isActive ? "Deactivate" : "Activate"}
                               </button>
 
                               {/* Reset Password Button */}
@@ -2069,23 +2312,35 @@ export default function OperatorDashboard() {
                                   setShowResetPasswordModal(v);
                                   setResetPasswordVal("");
                                   setResetPasswordError("");
+                                  setShowCurrentPassword(false);
+                                  setShowNewPassword(false);
+                                  setPasswordCopied(false);
                                 }}
-                                title="Reset login password"
+                                title="View & Reset login password (पासवर्ड देखें एवं बदलें)"
                                 style={{
-                                  padding: "6px 10px",
-                                  background: "white",
-                                  border: "1px solid #cbd5e1",
+                                  width: 88,
+                                  minWidth: 88,
+                                  height: 30,
+                                  minHeight: 30,
+                                  padding: "0 6px",
                                   borderRadius: 6,
-                                  color: "#475569",
-                                  fontSize: 12,
+                                  fontSize: 11.5,
                                   fontWeight: 600,
+                                  border: "1px solid #cbd5e1",
                                   cursor: "pointer",
                                   display: "inline-flex",
                                   alignItems: "center",
+                                  justifyContent: "center",
                                   gap: 4,
+                                  background: "white",
+                                  color: "#334155",
+                                  boxSizing: "border-box",
+                                  whiteSpace: "nowrap",
+                                  transition: "all 0.15s ease",
                                 }}
                               >
-                                <KeyRound size={12} /> Password
+                                <KeyRound size={12} />
+                                Password
                               </button>
                             </div>
                           </td>
@@ -2935,54 +3190,341 @@ export default function OperatorDashboard() {
                 </div>
               )}
 
-              {/* Facility Dropdown */}
+              {/* Searchable Facility Selector */}
               <div style={{ marginBottom: 14 }}>
                 <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
-                  Designated Healthcare Facility (स्वास्थ्य केंद्र) *
+                  Designated Healthcare Facility (स्वास्थ्य केंद्र) <span style={{ color: "#ef4444", marginLeft: 4 }}>*</span>
                 </label>
-                <select
-                  required
-                  value={newVerifierForm.facility}
-                  onChange={(e) => {
-                    const fac = e.target.value;
-                    const slug = fac.toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "").slice(0, 20);
-                    setNewVerifierForm((p) => ({
-                      ...p,
-                      facility: fac,
-                      username: p.username ? p.username : `verifier_${slug}`,
-                    }));
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    border: "1.5px solid #cbd5e1",
-                    borderRadius: 8,
-                    fontSize: 13.5,
-                    color: "#0f172a",
-                    background: "white",
-                  }}
-                >
-                  <option value="">— Select Hospital / Facility —</option>
-                  {Object.entries(facilitiesByBlock).map(([block, facList]) => (
-                    <optgroup key={block} label={`📍 ${block} Block (${facList.length})`}>
-                      {facList.map((fac) => {
-                        const facName = typeof fac === "string" ? fac : fac?.name;
-                        return (
-                          <option key={facName} value={facName}>
-                            {facName}
+
+                {newVerifierForm.facility ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      background: "#f0fdf4",
+                      border: "1.5px solid #86efac",
+                      borderRadius: 8,
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+                      <div
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 8,
+                          background: "#dcfce7",
+                          color: "#16a34a",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Building2 size={18} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 13.5,
+                            fontWeight: 700,
+                            color: "#166534",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {newVerifierForm.facility}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#15803d", marginTop: 1 }}>
+                          ✓ Selected Health Facility (चयनित अस्पताल)
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewVerifierForm((p) => ({ ...p, facility: "" }));
+                        setIsFacilityDropdownOpen(true);
+                      }}
+                      style={{
+                        padding: "6px 12px",
+                        background: "white",
+                        border: "1px solid #86efac",
+                        borderRadius: 6,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "#166534",
+                        cursor: "pointer",
+                        flexShrink: 0,
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      Change (बदलें)
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ position: "relative" }}>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                      {/* Search Input */}
+                      <div style={{ position: "relative", flex: 1 }}>
+                        <Search
+                          size={16}
+                          style={{
+                            position: "absolute",
+                            left: 12,
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            color: "#64748b",
+                            pointerEvents: "none",
+                          }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Search 606 facilities (e.g. Sadar, Jaynagar, Bisfi, APHC)..."
+                          value={newVerifierFacilitySearch}
+                          onFocus={() => setIsFacilityDropdownOpen(true)}
+                          onChange={(e) => {
+                            setNewVerifierFacilitySearch(e.target.value);
+                            setIsFacilityDropdownOpen(true);
+                          }}
+                          style={{
+                            width: "100%",
+                            padding: "10px 36px 10px 36px",
+                            border: "1.5px solid #cbd5e1",
+                            borderRadius: 8,
+                            fontSize: 13.5,
+                            color: "#0f172a",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                        {newVerifierFacilitySearch && (
+                          <button
+                            type="button"
+                            onClick={() => setNewVerifierFacilitySearch("")}
+                            style={{
+                              position: "absolute",
+                              right: 10,
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              background: "none",
+                              border: "none",
+                              color: "#94a3b8",
+                              cursor: "pointer",
+                              padding: 4,
+                            }}
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Block Filter */}
+                      <select
+                        value={newVerifierFacilityBlock}
+                        onChange={(e) => {
+                          setNewVerifierFacilityBlock(e.target.value);
+                          setIsFacilityDropdownOpen(true);
+                        }}
+                        style={{
+                          width: 170,
+                          padding: "10px 10px",
+                          border: "1.5px solid #cbd5e1",
+                          borderRadius: 8,
+                          fontSize: 12.5,
+                          color: "#0f172a",
+                          background: "white",
+                          boxSizing: "border-box",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <option value="ALL">All Blocks (सभी प्रखंड)</option>
+                        {availableBlocks.map((b) => (
+                          <option key={b} value={b}>
+                            {b}
                           </option>
-                        );
-                      })}
-                    </optgroup>
-                  ))}
-                </select>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Dropdown Options */}
+                    {isFacilityDropdownOpen && (
+                      <div
+                        data-lenis-prevent="true"
+                        onWheel={(e) => e.stopPropagation()}
+                        style={{
+                          maxHeight: 220,
+                          overflowY: "auto",
+                          background: "white",
+                          border: "1.5px solid #cbd5e1",
+                          borderRadius: 8,
+                          boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+                          zIndex: 20,
+                          position: "relative",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <div
+                          style={{
+                            padding: "6px 12px",
+                            background: "#f8fafc",
+                            borderBottom: "1px solid #f1f5f9",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#64748b",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span>{filteredNewVerifierFacilities.length} facilities match</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsFacilityDropdownOpen(false);
+                            }}
+                            title="Close dropdown (ड्रॉपडाउन बंद करें)"
+                            style={{
+                              background: "#e2e8f0",
+                              border: "none",
+                              color: "#334155",
+                              cursor: "pointer",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              padding: "2px 8px",
+                              borderRadius: 4,
+                              transition: "all 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = "#fee2e2";
+                              e.currentTarget.style.color = "#dc2626";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "#e2e8f0";
+                              e.currentTarget.style.color = "#334155";
+                            }}
+                          >
+                            <X size={12} />
+                            <span>Click to close</span>
+                          </button>
+                        </div>
+                        {filteredNewVerifierFacilities.length === 0 ? (
+                          <div style={{ padding: "16px 12px", textAlign: "center", color: "#64748b", fontSize: 12.5 }}>
+                            कोई अस्पताल नहीं मिला (No facility matching search)
+                          </div>
+                        ) : (
+                          filteredNewVerifierFacilities.slice(0, 60).map((fac) => {
+                            const facName = fac.name;
+                            return (
+                              <div
+                                key={facName}
+                                onClick={() => {
+                                  const slug = fac.username
+                                    ? fac.username.replace(/^verifier_/, "")
+                                    : facName.toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "").slice(0, 20);
+                                  setNewVerifierForm((p) => ({
+                                    ...p,
+                                    facility: facName,
+                                    username: p.username ? p.username : `verifier_${slug}`,
+                                  }));
+                                  setIsFacilityDropdownOpen(false);
+                                  setNewVerifierFacilitySearch("");
+                                }}
+                                style={{
+                                  padding: "9px 12px",
+                                  borderBottom: "1px solid #f1f5f9",
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  gap: 8,
+                                  transition: "background 0.1s ease",
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = "#eff6ff";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = "white";
+                                }}
+                              >
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <div
+                                    style={{
+                                      fontSize: 13,
+                                      fontWeight: 600,
+                                      color: "#0f172a",
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                    }}
+                                  >
+                                    {facName}
+                                  </div>
+                                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 1 }}>
+                                    📍 {fac.block} Block • PIN: {fac.pin}
+                                  </div>
+                                </div>
+                                <span
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    padding: "2px 7px",
+                                    borderRadius: 4,
+                                    background: "#f1f5f9",
+                                    color: "#475569",
+                                    border: "1px solid #e2e8f0",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {fac.type || "Facility"}
+                                </span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+
+                    {/* Hidden input for HTML5 required constraint */}
+                    <input
+                      type="text"
+                      required
+                      value={newVerifierForm.facility}
+                      onChange={() => {}}
+                      tabIndex={-1}
+                      style={{
+                        opacity: 0,
+                        height: 0,
+                        width: 0,
+                        position: "absolute",
+                        pointerEvents: "none",
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Grid 2 cols for Username & Password */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
                 <div>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
-                    Login ID / Username *
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-end",
+                      minHeight: 22,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#334155",
+                      marginBottom: 6,
+                    }}
+                  >
+                    Login ID / Username <span style={{ color: "#ef4444", marginLeft: 4 }}>*</span>
                   </label>
                   <input
                     type="text"
@@ -3003,40 +3545,84 @@ export default function OperatorDashboard() {
                       fontSize: 13.5,
                       color: "#0f172a",
                       fontFamily: "ui-monospace, monospace",
+                      boxSizing: "border-box",
                     }}
                   />
                   <span style={{ fontSize: 11, color: "#94a3b8" }}>3-30 lowercase characters, underscores</span>
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
-                    Password (पासवर्ड) *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    placeholder="Min 6 characters"
-                    value={newVerifierForm.password}
-                    onChange={(e) => setNewVerifierForm((p) => ({ ...p, password: e.target.value }))}
+                  <label
                     style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      border: "1.5px solid #cbd5e1",
-                      borderRadius: 8,
-                      fontSize: 13.5,
-                      color: "#0f172a",
+                      display: "flex",
+                      alignItems: "flex-end",
+                      minHeight: 22,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#334155",
+                      marginBottom: 6,
                     }}
-                  />
+                  >
+                    Password (पासवर्ड) <span style={{ color: "#ef4444", marginLeft: 4 }}>*</span>
+                  </label>
+                  <div style={{ position: "relative" }}>
+                    <input
+                      type={showNewVerifierPassword ? "text" : "password"}
+                      required
+                      minLength={6}
+                      placeholder="Min 6 characters"
+                      value={newVerifierForm.password}
+                      onChange={(e) => setNewVerifierForm((p) => ({ ...p, password: e.target.value }))}
+                      style={{
+                        width: "100%",
+                        padding: "10px 38px 10px 12px",
+                        border: "1.5px solid #cbd5e1",
+                        borderRadius: 8,
+                        fontSize: 13.5,
+                        color: "#0f172a",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewVerifierPassword((p) => !p)}
+                      title={showNewVerifierPassword ? "पासवर्ड छिपाएं (Hide)" : "पासवर्ड देखें (Show)"}
+                      style={{
+                        position: "absolute",
+                        right: 8,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        background: "none",
+                        border: "none",
+                        color: "#64748b",
+                        cursor: "pointer",
+                        padding: 4,
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      {showNewVerifierPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                   <span style={{ fontSize: 11, color: "#94a3b8" }}>At least 6 characters</span>
                 </div>
               </div>
 
-              {/* Authority Details: Name & Designation */}
+              {/* Authority Details: Name & Designation with Perfectly Aligned Labels */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
                 <div>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
-                    Authority Officer Full Name (अधिकारी का नाम) *
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-end",
+                      minHeight: 38,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#334155",
+                      marginBottom: 6,
+                    }}
+                  >
+                    Authority Officer Full Name (अधिकारी का नाम) <span style={{ color: "#ef4444", marginLeft: 4 }}>*</span>
                   </label>
                   <input
                     type="text"
@@ -3051,12 +3637,23 @@ export default function OperatorDashboard() {
                       borderRadius: 8,
                       fontSize: 13.5,
                       color: "#0f172a",
+                      boxSizing: "border-box",
                     }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-end",
+                      minHeight: 38,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#334155",
+                      marginBottom: 6,
+                    }}
+                  >
                     Official Designation (पदनाम)
                   </label>
                   <input
@@ -3071,6 +3668,7 @@ export default function OperatorDashboard() {
                       borderRadius: 8,
                       fontSize: 13.5,
                       color: "#0f172a",
+                      boxSizing: "border-box",
                     }}
                   />
                 </div>
@@ -3079,7 +3677,17 @@ export default function OperatorDashboard() {
               {/* Mobile & Email */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
                 <div>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-end",
+                      minHeight: 22,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#334155",
+                      marginBottom: 6,
+                    }}
+                  >
                     Official Mobile Number (मोबाइल नंबर)
                   </label>
                   <input
@@ -3100,12 +3708,23 @@ export default function OperatorDashboard() {
                       borderRadius: 8,
                       fontSize: 13.5,
                       color: "#0f172a",
+                      boxSizing: "border-box",
                     }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-end",
+                      minHeight: 22,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#334155",
+                      marginBottom: 6,
+                    }}
+                  >
                     Official Email (ईमेल)
                   </label>
                   <input
@@ -3120,6 +3739,7 @@ export default function OperatorDashboard() {
                       borderRadius: 8,
                       fontSize: 13.5,
                       color: "#0f172a",
+                      boxSizing: "border-box",
                     }}
                   />
                 </div>
@@ -3212,18 +3832,36 @@ export default function OperatorDashboard() {
               background: "white",
               borderRadius: 16,
               width: "100%",
-              maxWidth: 440,
+              maxWidth: 480,
               boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
               overflow: "hidden",
             }}
           >
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
-              <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0 }}>
-                Reset Password (पासवर्ड बदलें)
-              </h3>
-              <p style={{ color: "#64748b", fontSize: 12, margin: "3px 0 0" }}>
-                Username: <strong style={{ color: "#1e40af" }}>{showResetPasswordModal.username}</strong> ({showResetPasswordModal.facility})
-              </p>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: 7 }}>
+                  <KeyRound size={17} color="#1e40af" />
+                  Credential & Password (पासवर्ड विवरण एवं रीसेट)
+                </h3>
+                <p style={{ color: "#64748b", fontSize: 12, margin: "3px 0 0" }}>
+                  Username: <strong style={{ color: "#1e40af", fontFamily: "monospace" }}>{showResetPasswordModal.username}</strong> ({showResetPasswordModal.facility})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowResetPasswordModal(null)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#64748b",
+                  cursor: "pointer",
+                  padding: 4,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <X size={18} />
+              </button>
             </div>
 
             <form onSubmit={handleResetPassword} style={{ padding: "18px 20px" }}>
@@ -3243,26 +3881,154 @@ export default function OperatorDashboard() {
                 </div>
               )}
 
+              {/* Current Password Card */}
+              <div
+                style={{
+                  background: "#f8fafc",
+                  border: "1.5px solid #e2e8f0",
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  marginBottom: 18,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: "#334155", display: "flex", alignItems: "center", gap: 5 }}>
+                    <Lock size={13} color="#64748b" />
+                    Current Password (वर्तमान पासवर्ड):
+                  </span>
+                  <span style={{ fontSize: 11, color: "#64748b" }}>
+                    {showResetPasswordModal.rawPassword ? "सत्यापित पासवर्ड" : "डिफ़ॉल्ट सिस्टम पासवर्ड"}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    background: "white",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    gap: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: showCurrentPassword ? "#0f172a" : "#64748b",
+                      letterSpacing: showCurrentPassword ? "normal" : 2,
+                      userSelect: showCurrentPassword ? "all" : "none",
+                    }}
+                  >
+                    {showCurrentPassword ? (showResetPasswordModal.rawPassword || "Madhubani@2024") : "••••••••••••"}
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    {/* View / Hide Current Password */}
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword((p) => !p)}
+                      title={showCurrentPassword ? "पासवर्ड छिपाएं (Hide)" : "वर्तमान पासवर्ड देखें (Show current password)"}
+                      style={{
+                        background: "#f1f5f9",
+                        border: "1px solid #cbd5e1",
+                        borderRadius: 6,
+                        padding: "5px 9px",
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        color: "#334155",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
+                      {showCurrentPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+                      <span>{showCurrentPassword ? "Hide" : "Show"}</span>
+                    </button>
+
+                    {/* Copy Password Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pwd = showResetPasswordModal.rawPassword || "Madhubani@2024";
+                        navigator.clipboard.writeText(pwd);
+                        setPasswordCopied(true);
+                        setTimeout(() => setPasswordCopied(false), 2500);
+                      }}
+                      title="पासवर्ड कॉपी करें (Copy password)"
+                      style={{
+                        background: passwordCopied ? "#f0fdf4" : "#f1f5f9",
+                        border: `1px solid ${passwordCopied ? "#86efac" : "#cbd5e1"}`,
+                        borderRadius: 6,
+                        padding: "5px 9px",
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        color: passwordCopied ? "#15803d" : "#334155",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {passwordCopied ? <Check size={13} color="#16a34a" /> : <Copy size={13} />}
+                      <span>{passwordCopied ? "Copied!" : "Copy"}</span>
+                    </button>
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: "#64748b", marginTop: 5 }}>
+                  💡 यह वर्तमान पासवर्ड इस सत्यापनकर्ता के पोर्टल लॉगिन हेतु मान्य है।
+                </div>
+              </div>
+
+              {/* Set New Password Field */}
               <div style={{ marginBottom: 18 }}>
                 <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
-                  New Password (नया पासवर्ड) *
+                  Change to New Password (नया पासवर्ड सेट करें)
                 </label>
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  placeholder="Enter new password (min 6 characters)"
-                  value={resetPasswordVal}
-                  onChange={(e) => setResetPasswordVal(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    border: "1.5px solid #cbd5e1",
-                    borderRadius: 8,
-                    fontSize: 13.5,
-                    color: "#0f172a",
-                  }}
-                />
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    minLength={6}
+                    placeholder="Enter new password (min 6 characters)"
+                    value={resetPasswordVal}
+                    onChange={(e) => setResetPasswordVal(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 38px 10px 12px",
+                      border: "1.5px solid #cbd5e1",
+                      borderRadius: 8,
+                      fontSize: 13.5,
+                      color: "#0f172a",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((p) => !p)}
+                    title={showNewPassword ? "पासवर्ड छिपाएं (Hide)" : "नया पासवर्ड देखें (Show)"}
+                    style={{
+                      position: "absolute",
+                      right: 8,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      color: "#64748b",
+                      cursor: "pointer",
+                      padding: 4,
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <span style={{ fontSize: 11, color: "#94a3b8" }}>At least 6 characters (यदि पासवर्ड बदलना हो)</span>
               </div>
 
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
@@ -3281,20 +4047,21 @@ export default function OperatorDashboard() {
                     cursor: "pointer",
                   }}
                 >
-                  Cancel
+                  Close (बंद करें)
                 </button>
                 <button
                   type="submit"
                   disabled={resetPasswordLoading || !resetPasswordVal.trim()}
                   style={{
                     padding: "9px 18px",
-                    background: resetPasswordLoading ? "#93c5fd" : "#1e40af",
+                    background: resetPasswordLoading || !resetPasswordVal.trim() ? "#cbd5e1" : "#1e40af",
                     color: "white",
                     border: "none",
                     borderRadius: 8,
                     fontSize: 13,
                     fontWeight: 700,
-                    cursor: resetPasswordLoading ? "not-allowed" : "pointer",
+                    cursor: resetPasswordLoading || !resetPasswordVal.trim() ? "not-allowed" : "pointer",
+                    transition: "all 0.15s ease",
                   }}
                 >
                   {resetPasswordLoading ? "Saving..." : "Save New Password (अपडेट करें)"}

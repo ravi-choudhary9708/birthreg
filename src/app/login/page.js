@@ -78,8 +78,15 @@ export default function LoginPage() {
 
       if (!data.success) throw new Error(data.message);
 
-      // Redirect based on role
-      router.push(`/dashboard/${data.data.role}`);
+      // Clear any stale reload flags and set a fresh login timestamp
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("just_logged_in", Date.now().toString());
+        sessionStorage.removeItem("dashboard_refreshed");
+        sessionStorage.removeItem("dashboard_session_active");
+      }
+
+      // Hard navigation so browser navigation timing entry is cleanly set to 'navigate'
+      window.location.replace(`/dashboard/${data.data.role}`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -168,7 +175,7 @@ export default function LoginPage() {
               Official Staff Portal
             </h1>
             <p style={{ color: "#6b7280", fontSize: 14 }}>
-              Civil Registration System (CRS) • Verifier & Operator Login
+              Civil Registration System (CRS) • Verifier & Admin Login
             </p>
           </div>
         </div>
@@ -305,7 +312,7 @@ export default function LoginPage() {
           >
             <p style={{ fontSize: 12, color: "#1e40af" }}>
               🔒 This portal is for authorized staff only (Verifiers and
-              Operators). If you are a parent, please{" "}
+              Admin). If you are a parent, please{" "}
               <Link href="/track" style={{ fontWeight: 600 }}>
                 track your application here
               </Link>

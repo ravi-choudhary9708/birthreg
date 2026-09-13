@@ -34,6 +34,7 @@ model User {
   designation   String?
   contactNumber String?  @map("contact_number")
   email         String?
+  rawPassword   String?  @map("raw_password")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 

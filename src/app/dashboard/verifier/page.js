@@ -74,7 +74,7 @@ export default function VerifierDashboard() {
     try {
       const res = await fetch("/api/admin/applications");
       const data = await res.json();
-      if (res.status === 401) { router.push("/logout?reason=refresh"); return; }
+      if (res.status === 401) { router.push("/logout?reason=session_expired"); return; }
       if (!data.success) throw new Error(data.message);
       const list = Array.isArray(data.data) ? data.data : (data.data?.applications || []);
       setApps(list);
@@ -238,8 +238,32 @@ export default function VerifierDashboard() {
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    try {
+      sessionStorage.removeItem("dashboard_session_active");
+      sessionStorage.removeItem("just_logged_in");
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
     router.push("/logout?reason=manual");
+  };
+
+  const handleExitToHome = async (e) => {
+    e.preventDefault();
+    const confirmed = window.confirm(
+      "⚠️ सुरक्षा सूचना | Security Notice\n\nहोम पेज पर जाने पर आपका सत्र समाप्त हो जाएगा।\nYour session will be terminated. Proceed?"
+    );
+    if (!confirmed) return;
+
+    try {
+      sessionStorage.removeItem("dashboard_session_active");
+      sessionStorage.removeItem("just_logged_in");
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Logout error on exit:", err);
+    } finally {
+      window.location.replace("/");
+    }
   };
 
   // Metrics
@@ -346,10 +370,20 @@ export default function VerifierDashboard() {
       <div className="anim-ver-header" style={{ background: "white", borderBottom: "1px solid #e5e7eb", padding: "0 16px" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 60, flexWrap: "wrap", gap: 10, padding: "8px 0" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Link
-              href="/"
-              style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0 }}
-              title="Government of Bihar"
+            <button
+              type="button"
+              onClick={handleExitToHome}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                background: "none",
+                border: "none",
+                padding: 0,
+                margin: 0,
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+              title="Government of Bihar • Click to exit to Citizen Home"
             >
               <img
                 src="/bihar_government.webp"
@@ -366,7 +400,7 @@ export default function VerifierDashboard() {
                   e.currentTarget.src = "/logo.png";
                 }}
               />
-            </Link>
+            </button>
 
             <div
               style={{

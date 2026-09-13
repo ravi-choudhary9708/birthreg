@@ -9,6 +9,7 @@ function LogoutContent() {
   const searchParams = useSearchParams();
   const reason = searchParams.get("reason");
   const isRefresh = reason === "refresh";
+  const isExpired = reason === "session_expired";
 
   // Invalidate any active session cookies immediately
   useEffect(() => {
@@ -206,17 +207,19 @@ function LogoutContent() {
               style={{
                 display: "inline-block",
                 padding: "4px 12px",
-                background: isRefresh ? "#fffbeb" : "#dbeafe",
-                border: `1px solid ${isRefresh ? "#fde68a" : "#bfdbfe"}`,
+                background: isRefresh ? "#fffbeb" : isExpired ? "#fef3c7" : "#dbeafe",
+                border: `1px solid ${isRefresh ? "#fde68a" : isExpired ? "#fcd34d" : "#bfdbfe"}`,
                 borderRadius: 100,
                 fontSize: 12,
                 fontWeight: 600,
-                color: isRefresh ? "#92400e" : "#1e40af",
+                color: isRefresh ? "#92400e" : isExpired ? "#b45309" : "#1e40af",
                 marginBottom: 10,
               }}
             >
               {isRefresh
-                ? "सुरक्षा नीति • Security Policy Enforcement"
+                ? "सुरक्षा नीति कार्यान्वयन • Security Policy Enforcement"
+                : isExpired
+                ? "सत्र समय समाप्त • Session Expired"
                 : "सत्र समाप्त • Session Terminated"}
             </div>
 
@@ -228,10 +231,14 @@ function LogoutContent() {
                 margin: "0 0 6px",
               }}
             >
-              {isRefresh ? "सत्र समाप्त (Session Logged Out)" : "लॉग आउट सफल (Logged Out)"}
+              {isRefresh
+                ? "सत्र समाप्त (Session Logged Out)"
+                : isExpired
+                ? "सत्र समय समाप्त (Session Expired)"
+                : "लॉग आउट सफल (Logged Out)"}
             </h1>
             <p style={{ color: "#6b7280", fontSize: 13.5, margin: 0 }}>
-              Civil Registration System (CRS) • Verifier & Operator Portal
+              Civil Registration System (CRS) • Verifier & Admin Portal
             </p>
           </div>
 
@@ -265,6 +272,28 @@ function LogoutContent() {
                   </strong>
                   <p style={{ margin: 0, fontSize: 12.5, color: "#78350f", lineHeight: 1.55 }}>
                     सुरक्षा मानकों के अनुसार, संवेदनशील डेटा की सुरक्षा तथा अनधिकृत पहुंच रोकने हेतु पृष्ठ को रीफ़्रेश करने पर आपका लॉगिन सत्र स्वतः समाप्त कर दिया गया है।
+                  </p>
+                </div>
+              </div>
+            ) : isExpired ? (
+              <div
+                style={{
+                  background: "#fffbeb",
+                  border: "1.5px solid #fde68a",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 20,
+                  display: "flex",
+                  gap: 12,
+                }}
+              >
+                <AlertTriangle size={20} style={{ color: "#d97706", flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <strong style={{ display: "block", fontSize: 13.5, color: "#92400e", marginBottom: 4 }}>
+                    लॉगिन सत्र समाप्त हो चुका है (Session Expired)
+                  </strong>
+                  <p style={{ margin: 0, fontSize: 12.5, color: "#78350f", lineHeight: 1.55 }}>
+                    सुरक्षा कारणों से निष्क्रियता या समय सीमा समाप्त होने के कारण आपका सत्र समाप्त हो गया है। कृपया पुनः लॉगिन करें।
                   </p>
                 </div>
               </div>
@@ -319,7 +348,7 @@ function LogoutContent() {
                   boxSizing: "border-box",
                 }}
               >
-                <KeyRound size={17} /> पुनः लॉगिन करें (Log In Again) <ArrowRight size={16} />
+                <KeyRound size={17} /> पुनः लॉगिन करें (Log In Again)
               </Link>
 
               <Link
@@ -344,25 +373,6 @@ function LogoutContent() {
               >
                 <Home size={17} /> मुख्य पृष्ठ पर जाएँ (Go to Home)
               </Link>
-            </div>
-
-            {/* Advisory Note */}
-            <div
-              style={{
-                marginTop: 20,
-                padding: "12px 14px",
-                background: "#eff6ff",
-                borderRadius: 8,
-                border: "1px solid #bfdbfe",
-              }}
-            >
-              <p style={{ fontSize: 12, color: "#1e40af", margin: 0, lineHeight: 1.5 }}>
-                🔒 <strong>सुरक्षा सुझाव:</strong> सार्वजनिक अथवा साझा कंप्यूटर पर कार्य समाप्त होने के उपरांत ब्राउज़र विंडो अवश्य बंद करें। यदि आप आवेदक हैं, तो कृपया{" "}
-                <Link href="/track" style={{ fontWeight: 600, textDecoration: "underline", color: "#1d4ed8" }}>
-                  यहाँ आवेदन ट्रैक करें
-                </Link>
-                .
-              </p>
             </div>
           </div>
 

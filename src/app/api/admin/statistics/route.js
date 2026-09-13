@@ -40,10 +40,12 @@ export async function GET(request) {
         const dbFacilities = await prisma.facility.findMany({ select: { name: true } });
         const allFacilityNames = dbFacilities && dbFacilities.length > 0 ? dbFacilities.map((f) => f.name) : FACILITIES;
 
-        // Initialize map for facilities
-        const facilityStatsMap = {};
+        // Initialize map for facilities using exact unique facility names (606 facilities)
+        const facilityStatsMap = new Map();
+        const caseInsensitiveIndex = new Map();
+
         for (const fac of allFacilityNames) {
-            facilityStatsMap[fac.toUpperCase()] = {
+            const stat = {
                 facility: fac,
                 totalReceived: 0,
                 pendingVerifier: 0,
@@ -60,6 +62,11 @@ export async function GET(request) {
                 rejections: [],
                 overdueApplications: [],
             };
+            facilityStatsMap.set(fac, stat);
+            const upperKey = fac.toUpperCase();
+            if (!caseInsensitiveIndex.has(upperKey)) {
+                caseInsensitiveIndex.set(upperKey, stat);
+            }
         }
 
         let totalApplications = applications.length;
@@ -81,10 +88,14 @@ export async function GET(request) {
         };
 
         for (const app of applications) {
-            const facKey = (app.facility || "OTHER").toUpperCase();
-            if (!facilityStatsMap[facKey]) {
-                facilityStatsMap[facKey] = {
-                    facility: app.facility,
+            const facName = app.facility || "OTHER";
+            let fac = facilityStatsMap.get(facName);
+            if (!fac) {
+                fac = caseInsensitiveIndex.get(facName.toUpperCase());
+            }
+            if (!fac) {
+                fac = {
+                    facility: facName,
                     totalReceived: 0,
                     pendingVerifier: 0,
                     overdueVerifier: 0,
@@ -100,9 +111,9 @@ export async function GET(request) {
                     rejections: [],
                     overdueApplications: [],
                 };
+                facilityStatsMap.set(facName, fac);
+                caseInsensitiveIndex.set(facName.toUpperCase(), fac);
             }
-
-            const fac = facilityStatsMap[facKey];
             fac.totalReceived += 1;
 
             const createdTime = new Date(app.createdAt).getTime();
@@ -171,7 +182,7 @@ export async function GET(request) {
         }
 
         // Calculate averages and SLA compliance rates per facility
-        const facilityList = Object.values(facilityStatsMap).map(f => {
+        const facilityList = Array.from(facilityStatsMap.values()).map(f => {
             const processed = f.verifiedCount + f.rejectedCount;
             const avgDays = processed > 0 ? (f.totalTurnaroundDays / processed).toFixed(1) : "—";
             const complianceRate = (f.totalReceived > 0)

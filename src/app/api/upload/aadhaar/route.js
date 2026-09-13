@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { uploadAadhaarCard } from "@/libs/cloudinary";
+import { uploadAadhaarCard, deleteAadhaarCard } from "@/libs/cloudinary";
 import { apiResponse } from "@/utils/apiResponse";
 import { apiError } from "@/utils/apiError";
 
@@ -23,8 +23,8 @@ export async function POST(request) {
         const file = formData.get("file");
         const holder = String(formData.get("holder") || "document").toLowerCase();
 
-        if (!file || typeof file === "string") {
-            throw new apiError(400, "कृपया आधार कार्ड फ़ाइल चुनें (Please select an Aadhaar card file)");
+        if (!file || typeof file === "string" || file.size === 0) {
+            throw new apiError(400, "कृपया वैध आधार कार्ड फ़ाइल चुनें (0 बाइट्स फ़ाइल अमान्य है) (Please select a valid Aadhaar file)");
         }
 
         // Validate maximum file size (1MB)
@@ -80,13 +80,42 @@ export async function POST(request) {
         );
     } catch (error) {
         console.error("Aadhaar upload error:", error);
-        const statusCode = error.statusCode || 500;
+        const statusCode = error.http_code || error.statusCode || 500;
         return NextResponse.json(
             {
                 success: false,
-                message: error.message || "Failed to upload Aadhaar card to Cloudinary",
+                message: error.message || "दस्तावेज़ अपलोड विफल रहा (Failed to upload document)",
             },
             { status: statusCode }
         );
     }
 }
+
+export async function DELETE(request) {
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { publicId, url } = body;
+
+        if (!publicId && !url) {
+            throw new apiError(400, "publicId or url is required for deletion");
+        }
+
+        const result = await deleteAadhaarCard(publicId, url);
+
+        return NextResponse.json(
+            new apiResponse(200, result, "Aadhaar file removed from Cloudinary successfully"),
+            { status: 200 }
+        );
+    } catch (error) {
+        console.error("Aadhaar deletion error:", error);
+        const statusCode = error.statusCode || 500;
+        return NextResponse.json(
+            {
+                success: false,
+                message: error.message || "Failed to remove file from Cloudinary",
+            },
+            { status: statusCode }
+        );
+    }
+}
+

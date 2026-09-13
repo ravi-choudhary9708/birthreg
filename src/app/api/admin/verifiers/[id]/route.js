@@ -33,6 +33,7 @@ export async function PATCH(request, { params }) {
         throw new apiError(400, "Password must be at least 6 characters long");
       }
       updateData.password = await hashPassword(password.trim());
+      updateData.rawPassword = password.trim();
     }
 
     if (authorityName !== undefined) updateData.authorityName = authorityName?.trim() || null;
@@ -41,23 +42,62 @@ export async function PATCH(request, { params }) {
     if (email !== undefined) updateData.email = email?.trim() || null;
     if (facility !== undefined && facility.trim()) updateData.facility = facility.trim();
 
-    const updated = await prisma.user.update({
-      where: { id },
-      data: updateData,
-      select: {
-        id: true,
-        username: true,
-        facility: true,
-        role: true,
-        isActive: true,
-        authorityName: true,
-        designation: true,
-        contactNumber: true,
-        email: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    let updated;
+    try {
+      updated = await prisma.user.update({
+        where: { id },
+        data: updateData,
+        select: {
+          id: true,
+          username: true,
+          facility: true,
+          role: true,
+          isActive: true,
+          authorityName: true,
+          designation: true,
+          contactNumber: true,
+          email: true,
+          rawPassword: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (updateErr) {
+      if (updateErr.message?.includes("rawPassword")) {
+        delete updateData.rawPassword;
+        updated = await prisma.user.update({
+          where: { id },
+          data: updateData,
+          select: {
+            id: true,
+            username: true,
+            facility: true,
+            role: true,
+            isActive: true,
+            authorityName: true,
+            designation: true,
+            contactNumber: true,
+            email: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+        if (password && password.trim()) {
+          try {
+            await prisma.$executeRawUnsafe(
+              "UPDATE cert_users SET raw_password = $1 WHERE id = $2::uuid",
+              password.trim(),
+              id
+            );
+          } catch {
+            // ignore
+          }
+          updated.rawPassword = password.trim();
+        }
+      } else {
+        throw updateErr;
+      }
+    }
 
     const statusMsg =
       typeof isActive === "boolean"

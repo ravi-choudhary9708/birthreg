@@ -17,9 +17,11 @@ export default function AadhaarUpload({
   required = false,
 }) {
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
   const [uploadedFileName, setUploadedFileName] = useState("");
   const [uploadedFileSize, setUploadedFileSize] = useState(null);
+  const [uploadedPublicId, setUploadedPublicId] = useState("");
   const fileInputRef = useRef(null);
 
   const onUploadingChangeRef = useRef(onUploadingChange);
@@ -45,6 +47,13 @@ export default function AadhaarUpload({
   const handleFile = async (file) => {
     if (!file) return;
 
+    // 0. Validate non-empty file
+    if (!file || file.size === 0) {
+      setError("फ़ाइल खाली है (0 Bytes)। कृपया मान्य दस्तावेज़ फ़ाइल चुनें। (File is empty)");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
     // 1. Strictly validate file size: Max 1MB
     if (file.size > MAX_FILE_SIZE) {
       const sizeStr = (file.size / (1024 * 1024)).toFixed(2);
@@ -63,6 +72,9 @@ export default function AadhaarUpload({
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
+
+    const previousPublicId = uploadedPublicId;
+    const previousUrl = value;
 
     setError(null);
     setUploading(true);
@@ -85,8 +97,18 @@ export default function AadhaarUpload({
 
       setUploadedFileName(file.name);
       setUploadedFileSize(file.size);
+      setUploadedPublicId(json.data?.publicId || "");
       if (onChange) {
         onChange(json.data.url);
+      }
+
+      // If there was a previously uploaded file being replaced, delete it from Cloudinary
+      if (previousPublicId || previousUrl) {
+        fetch("/api/upload/aadhaar", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ publicId: previousPublicId, url: previousUrl }),
+        }).catch(() => {});
       }
     } catch (err) {
       console.error("Aadhaar upload error:", err);
@@ -98,19 +120,62 @@ export default function AadhaarUpload({
     }
   };
 
-  const handleRemove = (e) => {
-    e.stopPropagation();
+  const handleRemove = async (e) => {
+    if (e) e.stopPropagation();
+    if (deleting) return;
+
+    const publicIdToDelete = uploadedPublicId;
+    const urlToDelete = value;
+
     setError(null);
-    setUploadedFileName("");
-    setUploadedFileSize(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (onChange) onChange("");
+    setDeleting(true);
+
+    try {
+      // Delete file from Cloudinary
+      if (publicIdToDelete || urlToDelete) {
+        await fetch("/api/upload/aadhaar", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            publicId: publicIdToDelete,
+            url: urlToDelete,
+          }),
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to delete file from Cloudinary:", err);
+    } finally {
+      setDeleting(false);
+      setUploadedFileName("");
+      setUploadedFileSize(null);
+      setUploadedPublicId("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (onChange) onChange("");
+    }
   };
 
   const isPdf = Boolean(
     (uploadedFileName && uploadedFileName.toLowerCase().endsWith(".pdf")) ||
     (value && value.toLowerCase().includes(".pdf"))
   );
+
+  const getDisplayFileName = () => {
+    if (uploadedFileName) return uploadedFileName;
+    if (value) {
+      try {
+        const decoded = decodeURIComponent(value);
+        const actualUrl = decoded.includes("url=") ? decoded.split("url=")[1] : decoded;
+        const clean = actualUrl.split("?")[0].split("#")[0];
+        const lastPart = clean.split("/").pop();
+        if (lastPart && (lastPart.includes(".") || lastPart.startsWith("aadhaar_"))) {
+          return lastPart;
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return isPdf ? "Aadhaar_Document.pdf" : "Aadhaar_Document.jpg";
+  };
 
   return (
     <div style={{ marginTop: 8, marginBottom: 12 }}>
@@ -144,7 +209,7 @@ export default function AadhaarUpload({
         multiple={false}
         onChange={(e) => handleFile(e.target.files?.[0])}
         style={{ display: "none" }}
-        disabled={uploading}
+        disabled={uploading || deleting}
       />
 
       {/* State 1: Uploading State */}
@@ -158,14 +223,15 @@ export default function AadhaarUpload({
             display: "flex",
             alignItems: "center",
             gap: 12,
+            boxSizing: "border-box",
           }}
         >
-          <Loader2 size={20} className="animate-spin" style={{ color: "#2563eb", flexShrink: 0 }} />
+          <Loader2 size={24} className="animate-spin" style={{ color: "#2563eb", flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1e40af" }}>
-              Cloudinary पर अपलोड हो रहा है... (Uploading to Cloudinary...)
+              अपलोड हो रहा है... (Uploading...)
             </p>
-            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#3b82f6" }}>
+            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#3b82f6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               कृपया प्रतीक्षा करें, दस्तावेज़ सत्यापित किया जा रहा है
             </p>
           </div>
@@ -175,23 +241,26 @@ export default function AadhaarUpload({
       {/* State 2: Uploaded Success State */}
       {!uploading && value && (
         <div
+          title={`अपलोड की गई फ़ाइल (Uploaded file name): ${getDisplayFileName()}${uploadedFileSize ? ` • ${formatFileSize(uploadedFileSize)}` : ""}`}
           style={{
-            padding: "12px 14px",
+            padding: "14px 16px",
             background: "#f0fdf4",
-            border: "1.5px solid #86efac",
+            border: "1.5px dashed #86efac",
             borderRadius: 10,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             gap: 12,
-            flexWrap: "wrap",
+            boxSizing: "border-box",
+            transition: "all 0.2s ease",
           }}
         >
+          {/* Left: Icon & "File uploaded" with Tick symbol */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
             <div
               style={{
-                width: 36,
-                height: 36,
+                width: 34,
+                height: 34,
                 borderRadius: 8,
                 background: isPdf ? "#fee2e2" : "#e0e7ff",
                 color: isPdf ? "#dc2626" : "#4338ca",
@@ -201,11 +270,13 @@ export default function AadhaarUpload({
                 flexShrink: 0,
               }}
             >
-              {isPdf ? <FileText size={18} /> : <ImageIcon size={18} />}
+              {isPdf ? <FileText size={24} /> : <ImageIcon size={24} />}
             </div>
+
             <div style={{ minWidth: 0, flex: 1 }}>
+              {/* Primary line: Tick symbol + File uploaded */}
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <CheckCircle2 size={14} style={{ color: "#16a34a", flexShrink: 0 }} />
+                <CheckCircle2 size={15} style={{ color: "#16a34a", flexShrink: 0 }} />
                 <span
                   style={{
                     fontSize: 13,
@@ -215,29 +286,36 @@ export default function AadhaarUpload({
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                   }}
-                  title={uploadedFileName || "Aadhaar Card Document"}
                 >
-                  {uploadedFileName || (isPdf ? "Aadhaar_Document.pdf" : "Aadhaar_Document.jpg")}
+                  Uploaded
                 </span>
-                {uploadedFileSize && (
-                  <span style={{ fontSize: 11, color: "#15803d", fontWeight: 500, flexShrink: 0 }}>
-                    ({formatFileSize(uploadedFileSize)})
-                  </span>
-                )}
               </div>
-              <p style={{ margin: "2px 0 0", fontSize: 11, color: "#15803d" }}>
-                ✓ Cloudinary पर सुरक्षित रूप से संग्रहीत (Stored on Cloudinary)
+
+              {/* Subtitle line: Hint that hovering reveals filename */}
+              <p
+                style={{
+                  margin: "2px 0 0",
+                  fontSize: 11,
+                  color: "#15803d",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {uploadedFileSize ? `${formatFileSize(uploadedFileSize)} • ` : ""}To See File Name
               </p>
             </div>
           </div>
 
+          {/* Right: Actions Buttons matching upload button */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            {/* View Button */}
             <a
               href={getDocumentViewUrl(value)}
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                padding: "6px 12px",
+                padding: "5px 10px",
                 background: "#16a34a",
                 color: "white",
                 borderRadius: 6,
@@ -248,30 +326,44 @@ export default function AadhaarUpload({
                 alignItems: "center",
                 gap: 5,
                 transition: "background 0.2s",
+                cursor: "pointer",
               }}
               title="दस्तावेज़ नए टैब में देखें (View document in new tab)"
             >
               <ExternalLink size={13} /> देखें (View)
             </a>
+
+            {/* Remove Button */}
             <button
               type="button"
+              disabled={deleting}
               onClick={handleRemove}
               style={{
-                padding: "6px 10px",
+                padding: "5px 10px",
                 background: "white",
                 border: "1px solid #cbd5e1",
                 borderRadius: 6,
                 fontSize: 12,
                 fontWeight: 600,
                 color: "#dc2626",
-                cursor: "pointer",
+                cursor: deleting ? "not-allowed" : "pointer",
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 4,
+                gap: 5,
+                opacity: deleting ? 0.7 : 1,
+                transition: "all 0.15s ease",
               }}
-              title="दस्तावेज़ हटाएँ या दूसरा अपलोड करें (Remove or replace file)"
+              title="दस्तावेज़ हटाएँ (Remove file)"
             >
-              <Trash2 size={13} /> हटाएँ (Remove)
+              {deleting ? (
+                <>
+                  <Loader2 size={13} className="animate-spin" /> Removing...
+                </>
+              ) : (
+                <>
+                  <Trash2 size={13} /> हटाएँ (Remove)
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -291,6 +383,7 @@ export default function AadhaarUpload({
             alignItems: "center",
             justifyContent: "space-between",
             gap: 12,
+            boxSizing: "border-box",
             transition: "all 0.2s ease",
           }}
           onMouseEnter={(e) => {
@@ -302,7 +395,7 @@ export default function AadhaarUpload({
             e.currentTarget.style.background = "#f8fafc";
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
             <div
               style={{
                 width: 34,
@@ -318,8 +411,8 @@ export default function AadhaarUpload({
             >
               <Upload size={16} />
             </div>
-            <div>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1e293b"}}>
                 आधार कार्ड फ़ाइल चुनें (Choose Aadhaar Card)
               </p>
               <p style={{ margin: "2px 0 0", fontSize: 11, color: "#64748b" }}>

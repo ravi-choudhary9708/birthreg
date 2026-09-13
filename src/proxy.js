@@ -51,7 +51,11 @@ export function proxy(request) {
     requestHeaders.set("x-user-role", decoded.role);
     requestHeaders.set("x-user-facility", decoded.facility || "");
 
-    return NextResponse.next({ request: { headers: requestHeaders } });
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
+    response.headers.set("Pragma", "no-cache");
+    response.headers.set("Expires", "0");
+    return response;
 }
 
 export const config = {

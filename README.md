@@ -2,44 +2,14 @@
 
 This is a web application for applying and tracking birth certificates.
 
-## Staff Login Credentials
+## Staff Roles & Access
 
-All generated staff accounts use the following default password:
-**Password:** `Madhubani@2024`
+Staff access (Operator and Healthcare Facility Verifiers) is managed securely through role-based access control:
 
-*(⚠️ Please advise staff to change this default password after their first login)*
+- **Central Operator:** Oversees district-wide applications, SLA compliance, and facility verifier administration.
+- **Facility Verifiers:** Designated medical officers and staff across authorized healthcare facilities responsible for reviewing and verifying birth certificate applications.
 
-### Operator Account (Centralized)
-- **Username:** `operator_central`
-
-### Verifier Accounts (Per Facility - 606 Facilities across 21 Blocks)
-
-Every one of the **606 authorized government healthcare facilities** in Madhubani District has a designated verifier account with the default password `Madhubani@2024`.
-
-All verifier usernames follow the convention `verifier_<facility_slug>`. Verifier accounts and credentials are administered internally via the **Operator Central Dashboard**.
-
-#### Key District & Sub-Divisional Facility Credentials:
-- **District Hospital Madhubani (District Hospital):** `verifier_district_hospital`
-- **SDH Benipatti Madhubani:** `verifier_sdh_benipatti`
-- **SDH Jaynagar Madhubani:** `verifier_sdh_jaynagar`
-- **SDH Jhanjharpur Madhubani:** `verifier_sdh_jhanjharpur`
-- **SDH Phulparas Madhubani:** `verifier_sdh_phulparas`
-
-#### Sample CHC, PHC, & HWC Credentials:
-- **CHC ANDHRATHARI:** `verifier_chc_andhrathari`
-- **PHC BABUBARHI:** `verifier_phc_babubarhi`
-- **CHC BABUBARHI:** `verifier_chc_babubarhi`
-- **PRIMARY HEALTH CENTRE BASOPATTI:** `verifier_primary_health_centre_basopatti`
-- **CHC BISFI:** `verifier_chc_bisfi`
-- **PHC GHOGHARDIHA:** `verifier_phc_ghoghardiha`
-- **CHC HARLAKHI:** `verifier_chc_harlakhi`
-- **CHC KHAJAULI:** `verifier_chc_khajauli`
-- **CHC LADANIA:** `verifier_chc_ladania`
-- **CHC LAKHNAUR:** `verifier_chc_lakhnaur`
-- **PRIMARY HEALTH CENTRE PANDAUL:** `verifier_primary_health_centre_pandaul`
-- **CHC RAHIKA:** `verifier_chc_rahika`
-- **CHC RAJNAGAR:** `verifier_chc_rajnagar`
-- *(To look up any other facility's exact login ID among the 606, search the `/facilities` directory or Operator Dashboard)*
+Accounts and access credentials are created and managed securely via the administrative portal.
 
 ## Environment Setup
 Make sure to configure `.env.local` before starting the application:
