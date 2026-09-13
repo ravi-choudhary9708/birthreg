@@ -752,7 +752,7 @@ export default function OperatorDashboard() {
                   District Super Admin
                 </span>
               </div>
-              <div style={{ fontSize: 12, color: "#64748b" }}>Madhubani District • Department of Planning & Development, Govt. of Bihar</div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>Madhubani District • District Health Society & Civil Surgeon Office, Govt. of Bihar</div>
             </div>
           </div>
 
